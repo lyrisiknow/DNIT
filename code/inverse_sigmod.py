@@ -13,8 +13,9 @@ class torch_solver(nn.Module):
 
         super().__init__(*args, **kwargs)
         self.N = N
-        self.S = torch.tensor(S).cuda()
-        self.non_infected = torch.tensor(non_infected).cuda()
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.S = torch.tensor(S).to(self.device)
+        self.non_infected = torch.tensor(non_infected).to(self.device)
 
         A = torch.ones([N, N]) * 0.2
 
@@ -23,7 +24,7 @@ class torch_solver(nn.Module):
             A = A * prune_network
 
         A = -torch.log(1.0 / A - 1.0)
-        A = self.diag_zero(A).cuda()
+        A = self.diag_zero(A).to(self.device)
         self.register_parameter('A', nn.Parameter(A, requires_grad=True))
 
     def diag_zero(self, A):
@@ -65,7 +66,8 @@ def run_torch_version(A, S, iterations = 500, prune_network = None):
     # prune
     np.fill_diagonal(prune_network, 0.0)
     not_infected = not_infected_matrix(S)
-    model = torch_solver(N=N, S=S, non_infected=not_infected, prune_network=prune_network).cuda()
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = torch_solver(N=N, S=S, non_infected=not_infected, prune_network=prune_network).to(device)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=0.5)
     st = time.time()

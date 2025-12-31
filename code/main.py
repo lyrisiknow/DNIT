@@ -30,7 +30,7 @@ def generate_infections(A, num_sim = 100):
 if __name__ == '__main__':
 
     np.random.seed(2023)
-    N = 1000       # -N 1000
+    N = 1500       # -N 1000
     AVG_K = 15     # -k 15 (average_degree)
     MAX_K = 50     # -maxk 50 (max_degree)
     MU = 0.1       # -mu 0.1 (mu)
@@ -62,9 +62,9 @@ if __name__ == '__main__':
     P = np.zeros((N, N))
     for u, v in G.edges():
         if node_communities[u] & node_communities[v]:
-            weight = np.random.uniform(0.2, 0.4)
+            weight = np.random.uniform(0.05, 0.1)
         else:
-            weight = np.random.uniform(0.1, 0.3)
+            weight = np.random.uniform(0.01, 0.05)
         P[u, v] = weight
         P[v, u] = weight
     A = A * P
@@ -78,7 +78,7 @@ if __name__ == '__main__':
     prune_network[mi_matrix <= threshold] = 0.0
 
     #-------------------MCEM---------------------------
-    em_inference(S, A, sample_size = 10, prune_network = prune_network, iterations = 400)
+    # em_inference(S, A, sample_size = 10, prune_network = prune_network, iterations = 400)
 
     # -------------------inverse sigmod--------------------
     run_torch_version(A, S, iterations=1000, prune_network=prune_network)
