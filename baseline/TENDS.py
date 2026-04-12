@@ -246,7 +246,7 @@ def tends_algorithm(n, S):
 if __name__ == '__main__':
     # --- 设定参数 ---
     np.random.seed(2023)
-    N = 1000       # -N 1000
+    N = 1500       # -N 1000-3000
     AVG_K = 15     # -k 15 (average_degree)
     MAX_K = 50     # -maxk 50 (max_degree)
     MU = 0.1       # -mu 0.1 (mu)

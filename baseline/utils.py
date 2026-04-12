@@ -241,6 +241,6 @@ def result_record(alg_name, ret, dataset, param=''):
     record_dict = {key: ret}
     
     # 3. 追加写入文件
-    with open("result.json", 'a') as f:
+    with open("result.jsonl", 'a') as f:
         # json.dumps 会自动给键加上双引号，并将元组 (0.6..., ...) 转换为列表 [0.6..., ...]
         f.write(json.dumps(record_dict) + '\n')
