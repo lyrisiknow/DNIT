@@ -25,19 +25,31 @@ def compute_mutual_information(prob_matrix):
 
 def pruning_stage(mi_matrix):
     """
-    第一阶段：使用 K-means (K=2) 进行剪枝
+    第一阶段：改进的互信息剪枝（增加异常处理）
     """
     N = mi_matrix.shape[0]
     candidate_parents = {}
     
     for j in range(N):
         scores = mi_matrix[:, j].reshape(-1, 1)
-        # 使用 K-means 将候选节点分为两类：高相关和低相关
+        
+        # 检查数据点中不同数值的数量
+        unique_scores = np.unique(scores)
+        
+        # 如果数据点太少，或者所有互信息分数都一样
+        if len(unique_scores) < 2:
+            # 策略：如果分数全为 0，则没有候选父节点；否则将所有非零节点视为候选
+            if unique_scores[0] > 0:
+                candidate_parents[j] = np.where(mi_matrix[:, j] > 0)[0]
+            else:
+                candidate_parents[j] = np.array([])
+            continue
+
+        # 只有在至少有两个不同值时才运行 K-means
         kmeans = KMeans(n_clusters=2, n_init=10).fit(scores)
         labels = kmeans.labels_
         centers = kmeans.cluster_centers_.flatten()
         
-        # 选取聚类中心较大的那一类作为候选父节点
         high_corr_label = np.argmax(centers)
         candidate_parents[j] = np.where(labels == high_corr_label)[0]
         
@@ -80,7 +92,7 @@ def pind_inference(prob_matrix, max_iter=10):
     
     # 2. 交替最大化迭代
     print("正在进行非线性回归推断...")
-    for j in range(N):
+    for j in tqdm(range(N)):
         parents = candidate_parents[j]
         if len(parents) == 0: continue
         
@@ -89,7 +101,7 @@ def pind_inference(prob_matrix, max_iter=10):
         x = np.full(num_p, 0.5)
         alpha = 0.5 
         
-        for i in tqdm(range(max_iter)):
+        for i in range(max_iter):
             # 固定 alpha，优化 x
             # 约束条件：0 <= x <= 1
             bounds = [(0, 1)] * num_p
@@ -108,61 +120,68 @@ def pind_inference(prob_matrix, max_iter=10):
 if __name__ == '__main__':
     # --- 设定参数 ---
     np.random.seed(2023)
-    N = 1500       # -N 1000-3000
-    AVG_K = 15     # -k 15 (average_degree)
-    MAX_K = 50     # -maxk 50 (max_degree)
-    MU = 0.1       # -mu 0.1 (mu)
-    MIN_C = 20     # -minc 20 (min_community)
-    MAX_C = 50     # -maxc 50 (max_community)
-
-    # 必须指定的幂律指数 (使用常用值)
-    TAU1 = 2.0     # 度分布幂律指数
-    TAU2 = 2.0     # 社区规模幂律指数
-
-    # 由于参数约束较严格，我们增加最大迭代次数以防 ExceededMaxIterations 错误
-    MAX_I = 100000
-
-    # --- 生成 LFR Benchmark 图 ---
-    try:
-        G = nx.generators.community.LFR_benchmark_graph(
-            n=N, 
-            tau1=TAU1, 
-            tau2=TAU2, 
-            mu=MU, 
-            average_degree=AVG_K, 
-            max_degree=MAX_K,        # 指定最大度
-            min_community=MIN_C, 
-            max_community=MAX_C,     # 指定最大社区规模
-            max_iters=MAX_I,         # 增加迭代次数
-            seed=42
-        )
-
-        print(f"✅ LFR网络生成成功！")
-        print(f"生成的LFR网络节点数: {G.number_of_nodes()}")
-        print(f"生成的LFR网络边数: {G.number_of_edges()}")
-
-        # 获取地面真值社区
-        communities = {frozenset(G.nodes[v]['community']) for v in G}
-        print(f"真实的社区数量: {len(communities)}")
+    for N in [100,150,200,250,300]:
+        #N = 2000       # -N 1000-3000
+        # AVG_K = 15     # -k 15 (average_degree)
+        # MAX_K = 50     # -maxk 50 (max_degree)
+        # MU = 0.1       # -mu 0.1 (mu)
+        # MIN_C = 20     # -minc 20 (min_community)
+        # MAX_C = 50     # -maxc 50 (max_community)
         
-    except nx.ExceededMaxIterations as e:
-        print(f"❌ 生成失败: {e}")
-        print("请尝试进一步调整参数（例如增加MAX_I或略微放宽社区规模约束）。")
-    
-    node_communities = {n: G.nodes[n]['community'] for n in G.nodes}
+        AVG_K = 10     # 降低平均度
+        MAX_K = 30     # 降低最大度
+        MIN_C = 30     # 增加最小社区规模，确保能容纳度数较高的节点
+        MAX_C = 60
+        MU = 0.1       # -mu 0.1 (mu)
 
-    A = nx.to_numpy_array(G)
-    P = np.zeros((N, N))
-    for u, v in G.edges():
-        if node_communities[u] & node_communities[v]:
-            weight = np.random.uniform(0.05, 0.1)
-        else:
-            weight = np.random.uniform(0.01, 0.05)
-        P[u, v] = weight
-        P[v, u] = weight
-    A = A * P
-    S = generate_infections(A, num_sim=100)
-    
-    IG = nx.from_numpy_array(pind_inference(S), create_using=nx.DiGraph)
-    
-    result_record("SIDN", calculate_F1(IG, G), "LFR", f"n{N}")
+        # 必须指定的幂律指数 (使用常用值)
+        TAU1 = 2.0     # 度分布幂律指数
+        TAU2 = 2.0     # 社区规模幂律指数
+
+        # 由于参数约束较严格，我们增加最大迭代次数以防 ExceededMaxIterations 错误
+        MAX_I = 100000
+
+        # --- 生成 LFR Benchmark 图 ---
+        try:
+            G = nx.generators.community.LFR_benchmark_graph(
+                n=N, 
+                tau1=TAU1, 
+                tau2=TAU2, 
+                mu=MU, 
+                average_degree=AVG_K, 
+                max_degree=MAX_K,        # 指定最大度
+                min_community=MIN_C, 
+                max_community=MAX_C,     # 指定最大社区规模
+                max_iters=MAX_I,         # 增加迭代次数
+                seed=42
+            )
+
+            print(f"✅ LFR网络生成成功！")
+            print(f"生成的LFR网络节点数: {G.number_of_nodes()}")
+            print(f"生成的LFR网络边数: {G.number_of_edges()}")
+
+            # 获取地面真值社区
+            communities = {frozenset(G.nodes[v]['community']) for v in G}
+            print(f"真实的社区数量: {len(communities)}")
+            
+        except nx.ExceededMaxIterations as e:
+            print(f"❌ 生成失败: {e}")
+            print("请尝试进一步调整参数（例如增加MAX_I或略微放宽社区规模约束）。")
+        
+        node_communities = {n: G.nodes[n]['community'] for n in G.nodes}
+
+        A = nx.to_numpy_array(G)
+        P = np.zeros((N, N))
+        for u, v in G.edges():
+            if node_communities[u] & node_communities[v]:
+                weight = np.random.uniform(0.05, 0.1)
+            else:
+                weight = np.random.uniform(0.01, 0.05)
+            P[u, v] = weight
+            P[v, u] = weight
+        A = A * P
+        S = generate_infections(A, num_sim=100)
+        
+        IG = nx.from_numpy_array(pind_inference(S), create_using=nx.DiGraph)
+        
+        result_record("PIND", calculate_F1(IG, G), "LFR", f"n{N}")

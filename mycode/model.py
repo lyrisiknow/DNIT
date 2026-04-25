@@ -61,178 +61,135 @@ class RegularizedInference(nn.Module):
         super(RegularizedInference, self).__init__()
         
         self.N = N
-        self.S = Cascades              # 观测级联数据
-        self.C = InstancePartition     # 实例/社区划分
-        self.gamma = gamma             # 正则化强度
+        self.gamma = gamma
         
-        # 传播概率矩阵 A 的潜在参数 (Pre-sigmoid parameter)
-        # 将其设置为 nn.Parameter，PyTorch 才能优化它
-        # 初始值可以基于启发式或零初始化
-        self.A_param = nn.Parameter(torch.zeros(N, N, dtype=torch.float32))
+        # 优化参数
+        self.A_param = nn.Parameter(torch.full((N, N), -2.0))
         
+        # 处理剪枝网络并注册为 buffer (自动随模型 to(device))
         prune_network[prune_network == 0] = 1e-5
-        self.prune_network = torch.from_numpy(prune_network).float()
-        # 存储实例信息，用于正则化项计算
-        self.Instance_Info = self._preprocess_instance_info()
+        self.register_buffer('prune_network_tensor', torch.from_numpy(prune_network).float())
+
+        # =================================================================
+        # 预计算 1: 级联交互频率矩阵 K (彻底消除 forward 中的级联循环)
+        # =================================================================
+        S_np = np.array(Cascades)
+        self.num_cascades = S_np.shape[0]
+        
+        # S_I 为 1 (感染), S_O 为 0 (未感染)
+        S_I_tensor = torch.tensor((S_np == 1), dtype=torch.float32)
+        S_O_tensor = torch.tensor((S_np == 0), dtype=torch.float32)
+        
+        # K_matrix[i, j] 记录了多少次级联中：节点 i 感染 且 节点 j 未感染
+        K_matrix = torch.matmul(S_I_tensor.T, S_O_tensor) 
+        self.register_buffer('K_matrix', K_matrix)
+
+        # =================================================================
+        # 预计算 2: 实例划分掩码矩阵 M (彻底消除 regularization 中的实例循环)
+        # =================================================================
+        # 假设 InstancePartition 是 {node_id: instance_id} 或者列表
+        unique_insts = list(set(InstancePartition.values()) if isinstance(InstancePartition, dict) else set(InstancePartition))
+        num_insts = len(unique_insts)
+        M = torch.zeros(N, num_insts, dtype=torch.float32)
+        
+        for u in range(N):
+            inst_id = InstancePartition[u] if isinstance(InstancePartition, dict) else InstancePartition[u]
+            idx = unique_insts.index(inst_id)
+            M[u, idx] = 1.0
+            
+        self.register_buffer('M_matrix', M)
+        
+        # 计算每个实例包含的节点数，防止除以 0
+        counts = M.sum(dim=0).unsqueeze(1) # shape: (num_insts, 1)
+        counts[counts == 0] = 1.0 
+        self.register_buffer('M_counts', counts)
 
     def _get_prob_matrix(self):
-        """将潜在参数 A_param 转换成实际的传播概率矩阵 A (0 <= A <= 1)"""
-        # 使用 sigmoid 激活函数保证 A 在 [0, 1] 范围内
         A_prob = torch.sigmoid(self.A_param)
-        # 确保节点不能传播给自己 (对角线为零)
+        # 屏蔽对角线并应用剪枝网络
         A_prob = A_prob * (1.0 - torch.eye(self.N, device=A_prob.device))
-        A_prob = A_prob * self.prune_network
+        A_prob = A_prob * self.prune_network_tensor
         return A_prob
 
-    def _preprocess_instance_info(self):
-        """预处理实例信息，计算 Nu 和 A_avg 的辅助数据结构"""
-        # 假设 C 是一个字典 {node_id: instance_id}
-        # 找出每个实例的成员
-        instance_members = {}
-        for u in range(self.N):
-            inst_id = self.C[u]
-            if inst_id not in instance_members:
-                instance_members[inst_id] = []
-            instance_members[inst_id].append(u)
-            
-        return instance_members
-
-    def calculate_log_likelihood(self, A_prob):
-        num_cascades = len(self.S)
-        N = A_prob.shape[0]
-        log_L = torch.tensor(0.0, device=A_prob.device)
-        eps = 1e-8 # 防止 log(0)
-
-        for cascade in self.S:
-            S_I = np.where(cascade == 1)[0]
-            S_O = np.where(cascade == 0)[0]
-            
-            # --- Term 1: 归一化失败传播项 ---
-            S_I_tensor = torch.tensor(S_I, dtype=torch.long, device=A_prob.device)
-            S_O_tensor = torch.tensor(S_O, dtype=torch.long, device=A_prob.device)
-            
-            A_slice = A_prob[S_I_tensor[:, None], S_O_tensor[None, :]]
-            
-            # 使用 clamp 保证数值在 [eps, 1-eps] 之间
-            term1 = torch.sum(torch.log(1.0 - A_slice + eps))
-            
-            # --- Term 2: Log Det 项 ---
-            W_hat_l = self.construct_W_hat(A_prob) 
-            sign, log_abs_det = torch.linalg.slogdet(W_hat_l)
-            
-            # 这里的 log_abs_det 也可以根据该次级联的感染规模进行缩放
-            # term2 = log_abs_det / len(S_I) 
-            term2 = log_abs_det
-
-            log_L += (term1 + term2)
-
-        # --- 最终归一化 ---
-        # 1. 除以级联次数，使 Loss 与模拟次数无关
-        # 2. 如果数值依然很大，可以除以 N（节点数）
-        return log_L / (num_cascades * N)
-
-    def calculate_regularization(self, A_prob):
-        """
-        计算正则化项 Omega(A, C)
-        Omega(A, C) = Sum_k Sum_{i, j in C_k, i != j} || A_i,. - A_j,. ||^2
-        """
-        Omega = torch.tensor(0.0, device=A_prob.device)
-        
-        for inst_id, members in self.Instance_Info.items():
-            if len(members) > 1:
-                # 提取该实例内部所有节点的传播向量 A_i,.
-                A_block = A_prob[members, :]  # 维度: |I_k| x N
-                
-                # 计算 A_block 的平均向量
-                A_mean = torch.mean(A_block, dim=0, keepdim=True) # 1 x N
-                
-                # 使用中心化矩阵 X = A_block - A_mean
-                X = A_block - A_mean
-                
-                intra_variance = torch.sum(X**2)
-                
-                Omega += intra_variance
-                
-        return Omega
-
     def construct_W_hat(self, A_prob):
-        """
-        *** 请在这里实现 W_hat 矩阵的构造逻辑 ***
-        这个函数是特定于您的模型的。
-        它必须返回一个 PyTorch 张量，且是 A_prob 的可微分函数。
-        """
-        n = A_prob.size(0)
-        # 移除对角线元素
-        mask = (1.0 - torch.eye(n, device=A_prob.device, dtype=A_prob.dtype))
-        sub_A = A_prob * mask
+        # 向量化构造 W_hat (移除原有的 for 循环)
+        sub_A = A_prob * (1.0 - torch.eye(self.N, device=A_prob.device))
         W = -sub_A
-        for i in range(sub_A.shape[0]):
-            W[i, i] = torch.sum(sub_A[:, i])
-
+        # 将列和直接加到对角线上
+        W = W + torch.diag(torch.sum(sub_A, dim=0))
         return W
 
-
     def forward(self):
-        """
-        计算要最小化的目标函数 (负目标函数)
-        Minimize: -L(A) = -(log L(A|S) - gamma * Omega(A, C))
-                        = -log L(A|S) + gamma * Omega(A, C)
-        """
-        
-        # 1. 转换传播概率矩阵 A
         A_prob = self._get_prob_matrix()
+        eps = 1e-8
         
-        # 2. 计算负对数似然项
-        # PyTorch 会自动微分这里的复杂项
-        log_L = self.calculate_log_likelihood(A_prob)
-        NLL = -log_L # Negative Log Likelihood
+        # =================================================================
+        # 1. 高速计算 Negative Log Likelihood
+        # =================================================================
+        # Term 1: 矩阵点乘代替循环
+        # K_matrix 已经包含了所有的感染/未感染关系频次，直接做内积并求和
+        term1_total = torch.sum(self.K_matrix * torch.log(1.0 - A_prob + eps))
         
-        # 3. 计算正则化项
-        Omega = self.calculate_regularization(A_prob)
+        # Term 2: W_hat 矩阵仅受 A_prob 影响，与具体的级联无关
+        # 我们只需计算一次 slogdet，然后乘以总级联数！(速度飙升的关键点)
+        W_hat_l = self.construct_W_hat(A_prob)
+        sign, log_abs_det = torch.linalg.slogdet(W_hat_l)
+        term2_total = log_abs_det * self.num_cascades
         
-        # 4. 最终损失函数 (要最小化的值)
-        Loss = NLL + self.gamma * Omega
+        log_L = (term1_total + term2_total) / (self.num_cascades * self.N)
+        NLL = -log_L
         
-        return Loss
+        # =================================================================
+        # 2. 高速计算 Regularization (Omega)
+        # =================================================================
+        # 步骤 A: 计算每个 cluster 内部的 A_prob 均值向量 -> shape: (num_insts, N)
+        A_sum = torch.matmul(self.M_matrix.T, A_prob)
+        A_mean = A_sum / self.M_counts 
+        
+        # 步骤 B: 将均值重构回 (N, N) 用于计算方差
+        A_approx = torch.matmul(self.M_matrix, A_mean) 
+        
+        # 步骤 C: 均方差计算 (直接利用 tensor 操作，无需遍历)
+        Omega = torch.sum((A_prob - A_approx)**2) / (self.N * self.N) 
+        
+        # 3. 最终返回 Loss
+        return NLL + self.gamma * Omega
 
 def run_torch_version(G, N, S, C, gamma, prune_network, iterations=500, lr=0.01):
-    # 1. 初始化模型和优化器
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Training on device: {device}")
     
     np.fill_diagonal(prune_network, 0.0)
-    # 假设数据 S, C 已经被转换为 PyTorch tensors 或 Python 结构
+    
+    # 模型初始化时所有的预计算矩阵会被创建
     model = RegularizedInference(N=N, 
-                                Cascades=S, 
-                                InstancePartition=C, 
-                                gamma=gamma,
-                                prune_network=prune_network).to(device)
+                                 Cascades=S, 
+                                 InstancePartition=C, 
+                                 gamma=gamma,
+                                 prune_network=prune_network).to(device)
 
-    # 使用 Adam 优化器优化模型的参数 A_param
     optimizer = optim.Adam(model.parameters(), lr=lr) 
     
-    # 2. 训练循环
-    for i in tqdm.tqdm(range(iterations)):
+    model.train()
+    for i in tqdm.tqdm(range(iterations), desc="Optimizing"):
         optimizer.zero_grad()
-        
-        # forward() 计算 Loss = -log L + gamma * Omega
         loss = model() 
-        
-        # **反向传播：PyTorch 计算所有梯度，包括 log det 项的复杂梯度**
         loss.backward() 
-        
-        # **优化器步骤：更新参数 A_param**
         optimizer.step() 
         
-        print(f"Iteration {i}, Loss: {loss.item():.4f}")
+        # 为了避免影响 tqdm 的输出，建议降低打印频率 (比如每50轮打印一次)
+        if (i+1) % 50 == 0:
+            tqdm.tqdm.write(f"Iteration {i+1}, Loss: {loss.item():.4f}")
 
-    # 3. 评估和返回结果
-    # 将潜在参数 A_param 转换回传播概率矩阵 A*
-    A_star = model._get_prob_matrix().cpu().detach().numpy()
-    
+    model.eval()
+    with torch.no_grad():
+        A_star = model._get_prob_matrix().cpu().numpy()
+        
     A_star = A_star * prune_network
     A_star[A_star <= 1e-5] = 0.0
     
     best_t, IG = post_processing(A_star)
-    print( "BEP point : ", best_t, "P , R,  F1 : ", calculate_F1(IG, G))
-
-
+    P, R, F1 = calculate_F1(IG, G)
+    print(f"BEP point : {best_t:.5f} | P: {P}, R: {R}, F1: {F1}")
+    
+    return calculate_F1(IG, G)

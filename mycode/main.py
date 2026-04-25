@@ -59,6 +59,60 @@ def modified_kmeans(mi_matrix):
 
     return cluster, fixed_cluster
 
+def calculate_IMI(x):
+    '''
+    x: [n, m]  (n个节点, m个级联样本)
+    '''
+    [n, m] = x.shape
+
+    imi_matrix = np.zeros([n, n])
+    p = np.zeros([n, n])
+
+    # 预计算每个节点的边缘概率 P(Xi=1) 和 P(Xi=0)
+    p_1 = np.mean(x == 1, axis=1)
+    p_0 = np.mean(x == 0, axis=1)
+
+    for i in range(n):
+        v_i = x[i, :]
+        
+        for j in range(i + 1, n):
+            v_j = x[j, :]
+
+            # 计算联合概率 P(Xi, Xj)
+            p_i1_j1 = np.sum((v_i == 1) & (v_j == 1)) / m
+            p_i0_j0 = np.sum((v_i == 0) & (v_j == 0)) / m
+            p_i1_j0 = np.sum((v_i == 1) & (v_j == 0)) / m
+            p_i0_j1 = np.sum((v_i == 0) & (v_j == 1)) / m
+
+            # 计算条件概率 P(Xj=1 | Xi=1) 和 P(Xi=1 | Xj=1) 用于矩阵 P
+            if p_1[i] > 0:
+                p[i, j] = p_i1_j1 / p_1[i]
+            if p_1[j] > 0:
+                p[j, i] = p_i1_j1 / p_1[j]
+
+            # 按照公式计算 IMI 各项
+            # Helper function 计算单项 MI: P(x,y) * log(P(x,y)/(P(x)*P(y)))
+            def get_mi_component(p_xy, p_x, p_y):
+                if p_xy > 0 and p_x > 0 and p_y > 0:
+                    return p_xy * np.log(p_xy / (p_x * p_y))
+                return 0
+
+            # 1. 同向项 (Positive Contribution)
+            mi_11 = get_mi_component(p_i1_j1, p_1[i], p_1[j])
+            mi_00 = get_mi_component(p_i0_j0, p_0[i], p_0[j])
+
+            # 2. 反向项 (Negative Absolute Contribution)
+            mi_10 = get_mi_component(p_i1_j0, p_1[i], p_0[j])
+            mi_01 = get_mi_component(p_i0_j1, p_0[i], p_1[j])
+
+            # IMI(Xi, Xj) = MI(1,1) + MI(0,0) - |MI(1,0)| - |MI(0,1)|
+            val = mi_11 + mi_00 - np.abs(mi_10) - np.abs(mi_01)
+
+            imi_matrix[i, j] = val
+            imi_matrix[j, i] = val
+
+    return imi_matrix, p
+
 def calculate_MI(x):
     '''
     x: [n,beta]
@@ -226,7 +280,7 @@ if __name__ == '__main__':
     A = A * P
     S = generate_infections(A, num_sim=100)
     
-    mi_matrix, p_matrix = calculate_MI(S.T)
+    mi_matrix, p_matrix = calculate_IMI(S.T)
     cluster, fixed_cluster = modified_kmeans(mi_matrix)
     threshold = max(fixed_cluster.values())
     prune_network = np.zeros([N, N])
@@ -261,5 +315,6 @@ if __name__ == '__main__':
     for node in C:
         C[node] = dict_c[C[node]]
         
-    gamma = 0.01
+    gamma = 0.05
+    G = nx.from_numpy_array(A)
     run_torch_version(G, N, S, C, gamma, prune_network, iterations=500, lr=0.01)

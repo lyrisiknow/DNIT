@@ -10,155 +10,116 @@ from tqdm import tqdm
 from utils import generate_infections, result_record, calculate_F1, IC, Neighbour_finder
 
 def calculate_mi(S, i, j):
-    """
-    计算节点 vi 和 vj 感染状态之间的互信息 (Eq. 17)
-    """
+    """计算互信息，用于剪枝"""
     Xi = S[:, i]
     Xj = S[:, j]
-    
     mi = 0.0
-    # 遍历所有可能的状态组合 (0,0), (0,1), (1,0), (1,1)
     for val_i in [0, 1]:
+        p_i = np.mean(Xi == val_i)
+        if p_i == 0: continue
         for val_j in [0, 1]:
-            p_i = np.mean(Xi == val_i)
             p_j = np.mean(Xj == val_j)
             p_ij = np.mean((Xi == val_i) & (Xj == val_j))
-            
-            if p_ij > 0:
+            if p_ij > 0 and p_j > 0:
                 mi += p_ij * np.log2(p_ij / (p_i * p_j))
     return mi
 
-def kmeans_fixed_zero(mi_values, max_iters=100):
-    """
-    修改版的 K-means 算法 (K=2)，其中一个聚类中心固定为 0
-    用于计算剪枝阈值 tau
-    """
-    mi_array = np.array(list(mi_values.values()))
-    if len(mi_array) == 0:
-        return 0.0
-        
-    center_0 = 0.0 # 固定为0的中心
-    center_1 = np.max(mi_array) # 初始非零中心设为最大值
+def get_pruning_threshold(mi_dict):
+    """使用固定中心为0的K-means计算阈值tau"""
+    mis = np.array(list(mi_dict.values()))
+    if len(mis) == 0: return 0.0
     
-    for _ in range(max_iters):
-        # 分配簇：距离哪个中心更近
-        dist_0 = np.abs(mi_array - center_0)
-        dist_1 = np.abs(mi_array - center_1)
-        
-        cluster_0_mask = dist_0 <= dist_1
-        cluster_1_mask = dist_0 > dist_1
-        
-        # 重新计算非零中心
-        if np.any(cluster_1_mask):
-            new_center_1 = np.mean(mi_array[cluster_1_mask])
-        else:
-            break
-            
-        if np.abs(new_center_1 - center_1) < 1e-5:
-            break
-        center_1 = new_center_1
-        
-    # 返回均值接近 0 的那个簇中的最大 MI 值作为阈值 tau
-    return np.max(mi_array[cluster_0_mask]) if np.any(cluster_0_mask) else 0.0
+    c0 = 0.0
+    c1 = np.max(mis)
+    for _ in range(50): # 快速迭代
+        d0 = np.abs(mis - c0)
+        d1 = np.abs(mis - c1)
+        cluster1 = mis[d1 < d0]
+        if len(cluster1) == 0: break
+        new_c1 = np.mean(cluster1)
+        if abs(new_c1 - c1) < 1e-6: break
+        c1 = new_c1
+    
+    # 属于 c0 簇的最大值作为阈值
+    return np.max(mis[np.abs(mis - c0) <= np.abs(mis - c1)])
 
-def calculate_score(S, num_cascades, i, W):
+def fast_score(S, i, F_i_list):
     """
-    评分函数 g(vi, Fi) (Eq. 9)
+    优化的评分函数：利用状态压缩和快速计数
     """
-    score = 0.0
+    if not F_i_list: return -float('inf')
+    
+    beta = S.shape[0]
     Xi = S[:, i]
+    # 将父节点集合的状态压缩为元组进行统计
+    parents_data = S[:, F_i_list]
     
-    # 获取候选父节点状态的所有组合实例
-    if len(W) == 0:
-        return score
-        
-    X_W = S[:, list(W)]
-    
-    # 统计 N_ij1 (未感染) 和 N_ij2 (已感染)
+    # 统计 N_ij1 和 N_ij2
     counts = {}
-    for l in range(num_cascades):
-        parent_state = tuple(X_W[l])
-        node_state = Xi[l]
-        
-        if parent_state not in counts:
-            counts[parent_state] = {0: 0, 1: 0}
-        counts[parent_state][node_state] += 1
-        
-    # 处理阶乘，使用对数伽马函数 (ln(N!) = gammaln(N+1))
+    for l in range(beta):
+        # 转换为 tuple 以便作为字典键
+        p_state = tuple(parents_data[l])
+        if p_state not in counts:
+            counts[p_state] = [0, 0]
+        counts[p_state][int(Xi[l])] += 1
+    
     log2_e = np.log2(np.e)
-    
-    for count_dict in counts.values():
-        N_ij1 = count_dict[0]
-        N_ij2 = count_dict[1]
-        
-        log_N_ij1_fact = gammaln(N_ij1 + 1) * log2_e
-        log_N_ij2_fact = gammaln(N_ij2 + 1) * log2_e
-        log_sum_fact = gammaln(N_ij1 + N_ij2 + 1 + 1) * log2_e
-        
-        score += (log_N_ij1_fact + log_N_ij2_fact - log_sum_fact)
-        
-    return score
+    total_score = 0.0
+    for n1, n2 in counts.values():
+        # g(v_i, F_i) = log(n1!) + log(n2!) - log((n1+n2+1)!)
+        total_score += (gammaln(n1 + 1) + gammaln(n2 + 1) - gammaln(n1 + n2 + 2)) * log2_e
+    return total_score
 
-def run_twind_inference(S, num_nodes, num_cascades):
-    """
-    执行 TWIND 算法的主函数流程
-    :param S: 形状为 (num_cascades, num_nodes) 的 numpy array
-    :param num_nodes: 节点总数
-    :param num_cascades: 观测到的扩散过程总数
-    :return: 推断出的有向边集合 E (父节点 -> 子节点)
-    """
+def run_twind_fast(S):
+    beta, n = S.shape
     E = set()
-    
-    # 1. 计算互信息
-    print("Calculating Mutual Information...")
-    mi_values = {}
-    for i in tqdm(range(num_nodes)):
-        for j in range(num_nodes):
+
+    # 1. 计算所有配对的 MI 并剪枝
+    print("Step 1: Pruning with Mutual Information...")
+    all_mi = {}
+    for i in tqdm(range(n)):
+        for j in range(n):
             if i != j:
-                mi_values[(i, j)] = calculate_mi(S, i, j)
-                
-    # 2. 计算剪枝阈值 tau
-    print("Pruning candidate parents...")
-    tau = kmeans_fixed_zero(mi_values)
+                all_mi[(i, j)] = calculate_mi(S, i, j)
     
-    # 3. 计算父节点数量上限 eta
-    inner_log = np.log2(np.e * (num_cascades + 1) / 2)
-    eta = math.ceil(np.log2((num_cascades + 1) * inner_log))
-    print(f"Parent node limit (eta) calculated as: {eta}")
+    tau = get_pruning_threshold(all_mi)
     
-    # 4. 贪心搜索最优父节点集
-    print("Greedy searching for optimal parent sets...")
-    for i in tqdm(range(num_nodes)):
-        F_i = set()
-        P_i = set()
+    # 2. 计算理论上限 eta
+    log_part = np.log2(np.e * (beta + 1) / 2)
+    eta = math.ceil(np.log2((beta + 1) * log_part))
+    print(f"Step 2: Max parents allowed (eta) = {eta}")
+
+    # 3. 启发式贪心搜索
+    print("Step 3: Heuristic Greedy Search...")
+    for i in tqdm(range(n)):
+        # 获取候选父节点集合 Pi
+        P_i = [j for j in range(n) if i != j and all_mi[(i, j)] > tau]
         
-        # 筛选出互信息大于 tau 的候选父节点
-        for j in range(num_nodes):
-            if i != j and mi_values[(i, j)] > tau:
-                P_i.add(j)
+        F_i = [] # 当前选定的父节点集
+        current_best_score = -float('inf')
+        
+        # 贪心逐个添加节点，直到达到 eta 或分数不再提升
+        for _ in range(eta):
+            best_node_to_add = None
+            
+            for candidate in P_i:
+                if candidate in F_i: continue
                 
-        C_i = []
+                # 尝试将 candidate 加入 F_i 看分数变化
+                test_F = F_i + [candidate]
+                score = fast_score(S, i, test_F)
+                
+                if score > current_best_score:
+                    current_best_score = score
+                    best_node_to_add = candidate
+            
+            if best_node_to_add is not None:
+                F_i.append(best_node_to_add)
+            else:
+                break # 找不到更好的了，提前结束
         
-        # 生成候选子集并打分
-        for r in range(1, min(len(P_i), eta) + 1):
-            for w_tuple in itertools.combinations(P_i, r):
-                W = set(w_tuple)
-                score = calculate_score(S, num_cascades, i, W)
-                C_i.append({'W': W, 'score': score})
-        
-        # 贪心选择
-        while C_i:
-            best_item = max(C_i, key=lambda x: x['score'])
-            W_star = best_item['W']
-            
-            if len(F_i.union(W_star)) <= eta:
-                F_i = F_i.union(W_star)
-            
-            C_i.remove(best_item)
-            
-        # 记录发现的有向边
-        for parent in F_i:
-            E.add((parent, i))
+        for p in F_i:
+            E.add((p, i))
             
     return E
 
@@ -224,6 +185,6 @@ if __name__ == '__main__':
     S = generate_infections(A, num_sim=100)
     
     IG = nx.DiGraph()
-    IG.add_edges_from(run_twind_inference(S, N, 100))
+    IG.add_edges_from(run_twind_fast(S))
     
     result_record("TWIND", calculate_F1(IG, G), "LFR", f"n{N}")
