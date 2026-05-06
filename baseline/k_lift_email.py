@@ -1,7 +1,15 @@
 import networkx as nx
 import numpy as np
 import itertools
-from utils import result_record, calculate_F1
+from utils import result_record, calculate_F1, calculate_binary_auc
+from collections import Counter
+
+def get_size_factor(comm_id):
+    community_counts = Counter(node_communities.values())
+    size = community_counts[comm_id]
+    # 使用 log 缩放可以防止参数爆炸，+1 是为了防止 log(1)=0
+    return np.log1p(size)
+
 
 # --- 1. 适配函数：模拟扩散过程 (IC模型) ---
 def generate_infections(A_weighted, num_sim=100, seed_ratio=0.01):
@@ -94,19 +102,33 @@ if __name__ == '__main__':
             if l.strip() != '':
                 node_communities[int(l.strip().split(' ')[0])] = l.strip().split(' ')[0]
 
-    A = nx.to_numpy_array(G)
-    P = np.zeros((N, N))
-    for u, v in G.edges():
-        if node_communities[u] == node_communities[v]:
-            weight = np.random.uniform(0.05, 0.1)
-        else:
-            weight = np.random.uniform(0.01, 0.05)
-        P[u, v] = weight
-        P[v, u] = weight
-    A = A * P
-    # 调用适配的生成函数
-    # 建议 num_sim 设大一些（如 500+）以获得更准的 Lift 估计
-    S = generate_infections(A, num_sim=200) 
+        A = nx.to_numpy_array(G)
+        P = np.zeros((N, N))
+        for u, v in G.edges():
+            c_u = node_communities[u]
+            c_v = node_communities[v]
+            if c_u == c_v:
+                weight = np.random.uniform(0.05, 0.1)
+            else:
+                # 社区之间：核心修改点
+                # 基础跨社区概率
+                base_inter_weight = np.random.uniform(0.005, 0.02)
+                
+                # 规模增强因子：大社区与大社区之间概率更高
+                # 归一化因子（例如除以平均规模的 log 值）以保持权重在合理区间
+                size_boost = get_size_factor(c_u) * get_size_factor(c_v)
+                
+                # 最终权重映射，确保不会超过 0.5（IC 模型通常不建议单边概率过高）
+                weight = base_inter_weight * size_boost
+            
+            # 保证概率上限
+            weight = min(weight, 0.4)
+            P[u, v] = weight
+            P[v, u] = weight
+        A = A * P
+        # 调用适配的生成函数
+        # 建议 num_sim 设大一些（如 500+）以获得更准的 Lift 估计
+        S = generate_infections(A, num_sim=200) 
 
     # ==========================================
     # 剩下的推断与评估部分
@@ -119,7 +141,9 @@ if __name__ == '__main__':
     K_target = G.number_of_edges() # 设定推断边数等于真实边数
     predicted_edges = k_lifts_algorithm(vertices, lifts, K_target)
 
+    nodes = list(G.nodes())
     IG = nx.DiGraph()
+    IG.add_nodes_from(nodes)
     IG.add_edges_from(predicted_edges)
 
-    result_record("klifts", calculate_F1(IG, G), "email")
+    result_record("klifts", calculate_binary_auc(IG, G), "email", f"auc")

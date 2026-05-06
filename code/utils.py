@@ -1,5 +1,7 @@
 import networkx as nx
 import numpy as np
+from sklearn.metrics import roc_auc_score, average_precision_score
+import json
 
 def not_infected_matrix(S):
 
@@ -179,3 +181,45 @@ def post_processing(estimated_A):
     IG = nx.from_numpy_array(IG)
 
     return best_t, IG
+
+def result_record(alg_name, ret, dataset, param=''):
+    # 1. 动态构造键名 (Key)
+    key = f"{dataset}_{alg_name}_{param}" if param else f"{dataset}_{alg_name}"
+    
+    # 2. 构造字典对象
+    record_dict = {key: ret}
+    
+    # 3. 追加写入文件
+    with open("result.jsonl", 'a') as f:
+        # json.dumps 会自动给键加上双引号，并将元组 (0.6..., ...) 转换为列表 [0.6..., ...]
+        f.write(json.dumps(record_dict) + '\n')
+
+def calculate_binary_auc(IG, G):
+    """
+    基于二值化的预测图 IG 和真实图 G 计算指标。
+    注意：这里的 AUC 仅代表该特定阈值下的单点表现。
+    """
+    # 1. 转换为邻接矩阵
+    # 确保节点顺序一致
+    nodes = sorted(G.nodes())
+    adj_predict = nx.to_numpy_array(IG, nodelist=nodes)
+    adj_true = nx.to_numpy_array(G, nodelist=nodes)
+    
+    # 2. 提取上三角部分（忽略对角线，适用于无向图）
+    iu = np.triu_indices(len(nodes), k=1)
+    y_true = (adj_true[iu] > 0).astype(int)
+    y_predict = adj_predict[iu].astype(int)
+    
+    # 3. 安全检查
+    if len(np.unique(y_true)) < 2:
+        return 0.5, 0.0
+    
+    # 4. 计算指标
+    # 注意：此时 y_predict 是 0/1，roc_auc 相当于计算梯形的面积
+    binary_roc_auc = roc_auc_score(y_true, y_predict)
+    binary_pr_auc = average_precision_score(y_true, y_predict)
+    
+    print(f"Binary ROC-AUC: {binary_roc_auc:.4f}")
+    print(f"Binary PR-AUC: {binary_pr_auc:.4f}")
+    
+    return round(binary_roc_auc,4), round(binary_pr_auc,4)

@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import tqdm
 
-from utils import calculate_F1, post_processing, not_infected_matrix
+from utils import calculate_F1, post_processing, not_infected_matrix, result_record, calculate_binary_auc
 
 class torch_solver(nn.Module):
 
@@ -84,5 +84,6 @@ def run_torch_version(A, S, iterations = 500, prune_network = None):
     A[A <= 1e-5] = 0.0
     best_t, IG = post_processing(A)
     print("RUN TIME : ", end_time, "BEP point : ", best_t, "P , R,  F1 : ", calculate_F1(IG, G))
+    result_record("DNIT", calculate_binary_auc(IG,G), "LFR", param=f'n{N}auc')
 
 
