@@ -90,7 +90,7 @@ if __name__ == '__main__':
     # em_inference(S, A, sample_size = 10, prune_network = prune_network, iterations = 400)
 
     # -------------------inverse sigmod--------------------
-    result_record("DNIT", run_torch_version(A, S, iterations=1000, prune_network=prune_network), "email", param='auc')
+    result_record("DNIT", run_torch_version(A, S, iterations=10000, prune_network=prune_network), "email", param='auc')
 
 
 
