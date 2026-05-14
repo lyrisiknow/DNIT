@@ -9,6 +9,8 @@ import torch.nn.functional as F
 from sklearn.metrics import roc_auc_score, average_precision_score
 from tqdm import tqdm
 import copy
+from sklearn.metrics import mean_squared_error, mean_absolute_error
+from torch.optim.lr_scheduler import StepLR
 
 class RegularizedInferenceIC(nn.Module):
     def __init__(self, N, Cascades, InstancePartition, gamma, prune_network):
@@ -291,7 +293,68 @@ def post_processing_with_community(estimated_A, node_communities, beta=1.0):
     best_t = (t_inner + t_outer) / 2
     return best_t, IG
 
-def run_torch_version(G, N, S, C, gamma, prune_network, iterations=500, lr=0.01):
+def calculate_metrics_sklearn(A_pred, A_true):
+    # sklearn 的输入需要是平铺的向量或矩阵
+    # 它会自动处理多维矩阵
+    mse = mean_squared_error(A_true, A_pred)
+    mae = mean_absolute_error(A_true, A_pred)
+    
+    return mse, mae
+
+
+def post_processing_with_community_strict_inner(estimated_A, node_communities, beta=1.0):
+    N = estimated_A.shape[0]
+    comm_labels = np.array([node_communities[i] for i in range(N)])
+    same_comm_mask = (comm_labels[:, None] == comm_labels[None, :])
+    np.fill_diagonal(same_comm_mask, False)
+    diff_comm_mask = ~same_comm_mask
+    np.fill_diagonal(diff_comm_mask, False)
+
+    # --- 1. 数据驱动：计算社区优势 ---
+    mean_inner = np.mean(estimated_A[same_comm_mask])
+    mean_outer = np.mean(estimated_A[diff_comm_mask]) + 1e-9
+    # 依然计算这个比例，反映社区聚集效应的强度
+    advantage_ratio = np.clip(mean_inner / mean_outer, 1.0, 5.0) 
+
+    thresholds = np.linspace(1e-6, 0.5, 1000)
+
+    # --- 2. 搜索同社区阈值 t_inner (执行更严格的标准) ---
+    # 修改点：将 beta 除以 advantage_ratio
+    # 逻辑：减小 beta 意味着我们更讨厌“误报”(FP)，即对同社区的边要求更苛刻
+    beta_inner = beta / advantage_ratio 
+    
+    diff_inner = np.zeros(len(thresholds))
+    for i, t in enumerate(thresholds):
+        # pred_fn: 漏报（有边没连上）的概率累积
+        # pred_fp: 误报（无边强行连）的概率累积
+        pred_fn = np.sum(estimated_A[same_comm_mask & (estimated_A < t)])
+        pred_fp = np.sum(1.0 - estimated_A[same_comm_mask & (estimated_A >= t)])
+        # 此时 beta_inner 变小，公式平衡点会向更大的 t 移动
+        diff_inner[i] = np.abs(pred_fp - beta_inner * pred_fn)
+        
+    t_inner = thresholds[np.argmin(diff_inner)]
+
+    # --- 3. 搜索跨社区阈值 t_outer (保持常规) ---
+    diff_outer = np.zeros(len(thresholds))
+    for i, t in enumerate(thresholds):
+        pred_fn = np.sum(estimated_A[diff_comm_mask & (estimated_A < t)])
+        pred_fp = np.sum(1.0 - estimated_A[diff_comm_mask & (estimated_A >= t)])
+        diff_outer[i] = np.abs(pred_fp - beta * pred_fn)
+        
+    t_outer = thresholds[np.argmin(diff_outer)]
+
+    print(f"Data-driven Advantage Ratio: {advantage_ratio:.2f}")
+    print(f"Strict Inner Threshold: {t_inner:.5f} | Normal Outer Threshold: {t_outer:.5f}")
+
+    # --- 4. 构造最终图 ---
+    IG_mat = np.zeros_like(estimated_A)
+    IG_mat[same_comm_mask & (estimated_A >= t_inner)] = 1
+    IG_mat[diff_comm_mask & (estimated_A >= t_outer)] = 1
+    
+    IG = nx.from_numpy_array(IG_mat)
+    return (t_inner + t_outer) / 2, IG
+
+def run_torch_version(G, N, S, C, A, gamma, prune_network, iterations=500, lr=0.01):
     patience = 300      # 连续 300 轮 Loss 不下降则早停
     best_loss = float('inf')
     counter = 0         # 早停计数器
@@ -366,4 +429,4 @@ def run_torch_version(G, N, S, C, gamma, prune_network, iterations=500, lr=0.01)
     # 调用后处理逻辑
     # 建议：如果 FN 依然很高，尝试传入 beta=1.5 或 2.0
     best_t, IG = post_processing_with_community(A_star, C) 
-    return calculate_binary_auc(IG, G)
+    return calculate_binary_auc(IG, G), calculate_F1(IG, G), calculate_metrics_sklearn(A_star, A)

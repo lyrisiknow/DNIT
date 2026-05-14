@@ -298,20 +298,20 @@ def generate_infections(A, num_sim = 100):
     return S
 
 if __name__ == '__main__':
-    for N in [100,150,200,250,300]:
+    for N in [1000,1500,2000,2500,3000]:
         np.random.seed(2023)
         # N = 3000       # -N 1000-3000
-        # AVG_K = 15     # -k 15 (average_degree)
-        # MAX_K = 50     # -maxk 50 (max_degree)
-        # MU = 0.1       # -mu 0.1 (mu)
-        # MIN_C = 20     # -minc 20 (min_community)
-        # MAX_C = 50     # -maxc 50 (max_community)
-
-        AVG_K = 10     # 降低平均度
-        MAX_K = 30     # 降低最大度
-        MIN_C = 30     # 增加最小社区规模，确保能容纳度数较高的节点
-        MAX_C = 60
+        AVG_K = 15     # -k 15 (average_degree)
+        MAX_K = 50     # -maxk 50 (max_degree)
         MU = 0.1       # -mu 0.1 (mu)
+        MIN_C = 20     # -minc 20 (min_community)
+        MAX_C = 50     # -maxc 50 (max_community)
+
+        # AVG_K = 10     # 降低平均度
+        # MAX_K = 30     # 降低最大度
+        # MIN_C = 30     # 增加最小社区规模，确保能容纳度数较高的节点
+        # MAX_C = 60
+        # MU = 0.1       # -mu 0.1 (mu)
 
         # 必须指定的幂律指数 (使用常用值)
         TAU1 = 2.0     # 度分布幂律指数
@@ -405,9 +405,12 @@ if __name__ == '__main__':
         for node in C:
             C[node] = dict_c[C[node]]
             
-        gamma = 0.05
+        gamma = 0.1
         
         iterations = 10000
         lr = 0.01
+        auc, f1, me = run_torch_version(G, N, S, C, A, gamma, prune_network, iterations = iterations, lr=lr)
+        result_record("mymodel", auc, "LFR", param=f'n{N}auc')
+        result_record("mymodel", f1, "LFR", param=f'n{N}f1')
+        result_record("mymodel", me, "LFR", param=f'n{N}me')
         
-        result_record("mymodel", run_torch_version(G, N, S, C, gamma, prune_network, iterations = iterations, lr=lr), "LFR", param=f'n{N}auc')
