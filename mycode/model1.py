@@ -10,6 +10,7 @@ from sklearn.metrics import roc_auc_score, average_precision_score
 from tqdm import tqdm
 import copy
 from sklearn.metrics import mean_squared_error, mean_absolute_error
+from torch.optim.lr_scheduler import StepLR
 
 class RegularizedInferenceIC(nn.Module):
     def __init__(self, N, Cascades, InstancePartition, gamma, prune_network):

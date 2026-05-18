@@ -405,7 +405,7 @@ if __name__ == '__main__':
         for node in C:
             C[node] = dict_c[C[node]]
             
-        gamma = 0.05
+        gamma = 0.1
         
         iterations = 10000
         lr = 0.01

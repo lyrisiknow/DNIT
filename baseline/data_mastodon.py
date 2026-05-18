@@ -1,7 +1,6 @@
 import numpy as np
 from scipy.special import gammaln
 import itertools
-import math
 from itertools import combinations
 from sklearn.cluster import KMeans
 import math
