@@ -2,6 +2,7 @@ import networkx as nx
 import numpy as np
 import json
 from sklearn.metrics import roc_auc_score, average_precision_score
+from tqdm import tqdm
 
 def not_infected_matrix(S):
 
@@ -183,22 +184,38 @@ def post_processing(estimated_A):
     return best_t, IG
 
 def generate_infections(A, num_sim = 100):
-
     N = A.shape[0]
     S = np.zeros([num_sim, N])
     nx_graph = nx.from_numpy_array(A)
     trees = []
+    
+    # 1. 初始化进度条，总数为目标数量 num_sim
+    pbar = tqdm(total=num_sim, desc="Generating Infections")
+    
+    attempts = 0 # 用于记录总循环次数（包括失败的尝试）
+    
     while len(trees) < num_sim:
+        attempts += 1
         seed = np.random.choice(np.arange(0, N), size=1)
         cascade, tree = IC(Networkx_Graph=nx_graph, Seed_Set=seed, Probability=A)
+        
+        # 满足条件的感染才会被记录
         if len(tree.nodes) >= 3:
             S[len(trees), cascade] = 1
             trees.append(tree)
-    average_paths = 0
-    for tree in trees:
-        average_paths += len(tree.nodes())
+            
+            # 2. 成功添加一个 tree 后，更新进度条
+            pbar.update(1)
+        
+        # 3. 每轮循环更新后缀信息，显示当前的尝试次数
+        if attempts % 10 == 0:
+            pbar.set_postfix({"Total_Cycles": attempts, "Current_Trees": len(trees)})
 
-    print("average length of infections: ", average_paths / len(trees))
+    pbar.close() # 循环结束，关闭进度条
+
+    average_paths = sum(len(tree.nodes()) for tree in trees)
+    print(f"\naverage length of infections: {average_paths / len(trees)}")
+    
     return S
 
 def IC(Networkx_Graph, Seed_Set, Probability):

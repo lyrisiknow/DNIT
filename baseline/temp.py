@@ -19,7 +19,7 @@ if __name__ == '__main__':
     # ==========================================
     # 这里插入你给出的原始代码 (保持不动)
     # ==========================================
-    for N in [1000,1500,2000,2500,3000]:
+    for N in [2000,2500,3000]:
         np.random.seed(2023)
         #N = 2000       # -N 1000-3000
         AVG_K = 15     # -k 15 (average_degree)
@@ -115,20 +115,20 @@ if __name__ == '__main__':
         IG = nx.DiGraph()
         IG.add_nodes_from(nodes)
         IG.add_edges_from(run_twind_fast(S))
-        result_record("TWIND", calculate_binary_auc(IG, G), "LFR", f"n{N}auc")
+        result_record("TWIND", calculate_F1(IG, G), "LFR", f"n{N}f1")
         
         print('TENDS:')
         IG = nx.DiGraph()
         IG.add_nodes_from(nodes)
         IG.add_edges_from(tends_algorithm(N, S))
-        result_record("TENDS", calculate_binary_auc(IG, G), "LFR", f"n{N}auc")
+        result_record("TENDS", calculate_F1(IG, G), "LFR", f"n{N}f1")
         
         print('SIDN:')
         IG = nx.DiGraph()
         IG = nx.from_numpy_array(infer_sidn_network(S), create_using=nx.DiGraph)
-        result_record("SIDN", calculate_binary_auc(IG, G), "LFR", f"n{N}auc")
+        result_record("SIDN", calculate_F1(IG, G), "LFR", f"n{N}f1")
         
         print('PIND:')
         IG = nx.DiGraph()
         IG = nx.from_numpy_array(pind_inference(S), create_using=nx.DiGraph)
-        result_record("PIND", calculate_binary_auc(IG, G), "LFR", f"n{N}auc")
+        result_record("PIND", calculate_F1(IG, G), "LFR", f"n{N}f1")
