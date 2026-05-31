@@ -13,8 +13,8 @@ data_map = defaultdict(lambda: defaultdict(dict))
 auc_file_path = 'result_process.jsonl'  
 time_file_path = 'time_process.jsonl'            
 
-auc_pattern = re.compile(r'^email_(.+)_p(\d+)auc$')
-time_pattern = re.compile(r'^email_(.+)_p(\d+)$')
+auc_pattern = re.compile(r'^workplace_(.+)_p(\d+)auc$')
+time_pattern = re.compile(r'^workplace_(.+)_p(\d+)$')
 
 all_existing_counts = set()
 
@@ -149,4 +149,4 @@ fig.legend(handles=lines_handles,
 plt.subplots_adjust(top=0.76, bottom=0.16, left=0.10, right=0.92, hspace=0.2, wspace=0.30)
 
 plt.show()
-plt.savefig('auc_time_process_email.png', dpi=300)
+plt.savefig('auc_time_process_workplace.png', dpi=300)

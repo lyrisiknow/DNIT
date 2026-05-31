@@ -30,7 +30,6 @@ with open(auc_file_path, 'r', encoding='utf-8') as f:
                     model_name = match.group(1)
                     process_count = int(match.group(2))
                     pr_auc = val[1]  
-                    
                     data_map[model_name][process_count]['pr_auc'] = pr_auc
                     all_existing_counts.add(process_count)
         except json.JSONDecodeError:
@@ -48,11 +47,29 @@ with open(time_file_path, 'r', encoding='utf-8') as f:
                     model_name = match.group(1)
                     process_count = int(match.group(2))
                     run_time = val   
-                    
                     data_map[model_name][process_count]['time'] = run_time
                     all_existing_counts.add(process_count)
         except json.JSONDecodeError:
             pass
+# --- [修改结束] ---
+
+# --- [新增：读取 model_style_config.jsonl] ---
+model_styles = {}
+try:
+    with open('model_style_config.jsonl', 'r', encoding='utf-8') as f:
+        for line in f:
+            entry = json.loads(line)
+            # 处理字符串形式的线型 tuple
+            style = entry['linestyle']
+            if style.startswith('('):
+                style = eval(style)
+            model_styles[entry['model_name']] = {
+                'color': entry['color'],
+                'marker': entry['marker'],
+                'linestyle': style
+            }
+except FileNotFoundError:
+    print("警告: 未找到 model_style_config.jsonl")
 
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(11, 4.8))
 
@@ -63,31 +80,30 @@ sorted_x_ticks = sorted(list(all_existing_counts))
 lines_handles = []
 labels_list = []
 
-for idx, (model_name, points) in enumerate(data_map.items()):
+for model_name, points in data_map.items():
     valid_counts = sorted([c for c in points.keys() if 'pr_auc' in points[c] and 'time' in points[c]])
-    if not valid_counts:
-        continue  
+    if not valid_counts: continue 
         
     sorted_pr = [points[c]['pr_auc'] for c in valid_counts]
     sorted_time = [points[c]['time'] for c in valid_counts]
     
-    current_color = icdm_colors[idx % len(icdm_colors)]
-    current_marker = markers[idx % len(markers)]
+    # 从字典获取样式，默认值为黑色实线
+    style = model_styles.get(model_name, {'color': 'black', 'marker': 'o', 'linestyle': '-'})
     
     line1, = ax1.plot(valid_counts, sorted_pr, 
-                      color=current_color, 
-                      marker=current_marker, 
+                      color=style['color'], 
+                      marker=style['marker'], 
                       markersize=5.5,          
-                      linewidth=1,         
-                      linestyle='--',        
+                      linewidth=1,        
+                      linestyle=style['linestyle'],       
                       label=model_name)
     
     ax2.plot(valid_counts, sorted_time, 
-             color=current_color, 
-             marker=current_marker, 
+             color=style['color'], 
+             marker=style['marker'], 
              markersize=5.5, 
              linewidth=1, 
-             linestyle='--',        
+             linestyle=style['linestyle'],       
              label=model_name)
     
     lines_handles.append(line1)

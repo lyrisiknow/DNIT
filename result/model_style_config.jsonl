@@ -1,0 +1,7 @@
+{"model_name": "DNIT", "color": "#1F77B4", "marker": "o", "linestyle": "-"}
+{"model_name": "PIND", "color": "#D62728", "marker": "s", "linestyle": "--"}
+{"model_name": "SIDN", "color": "#308F30", "marker": "^", "linestyle": "-."}
+{"model_name": "TENDS", "color": "#694789", "marker": "D", "linestyle": ":"}
+{"model_name": "TWIND", "color": "#736E6E", "marker": "v", "linestyle": "(0, (3, 5, 1, 5))"}
+{"model_name": "klifts", "color": "#C36184", "marker": "p", "linestyle": "(0, (5, 5))"}
+{"model_name": "mymodel", "color": "#D68636", "marker": "h", "linestyle": "(0, (1, 1))"}
