@@ -298,20 +298,20 @@ def generate_infections(A, num_sim = 100):
     return S
 
 if __name__ == '__main__':
-    for N in [100,150,200,250,300]:
+    for n_sim in [1000,1500]:
         np.random.seed(2023)
-        # N = 3000       # -N 1000-3000
-        # AVG_K = 15     # -k 15 (average_degree)
-        # MAX_K = 50     # -maxk 50 (max_degree)
-        # MU = 0.1       # -mu 0.1 (mu)
-        # MIN_C = 20     # -minc 20 (min_community)
-        # MAX_C = 50     # -maxc 50 (max_community)
-
-        AVG_K = 10     # 降低平均度
-        MAX_K = 30     # 降低最大度
-        MIN_C = 30     # 增加最小社区规模，确保能容纳度数较高的节点
-        MAX_C = 60
+        N = 1000       # -N 1000-3000
+        AVG_K = 15     # -k 15 (average_degree)
+        MAX_K = 50     # -maxk 50 (max_degree)
         MU = 0.1       # -mu 0.1 (mu)
+        MIN_C = 20     # -minc 20 (min_community)
+        MAX_C = 50     # -maxc 50 (max_community)
+
+        # AVG_K = 10     # 降低平均度
+        # MAX_K = 30     # 降低最大度
+        # MIN_C = 30     # 增加最小社区规模，确保能容纳度数较高的节点
+        # MAX_C = 60
+        # MU = 0.1       # -mu 0.1 (mu)
 
         # 必须指定的幂律指数 (使用常用值)
         TAU1 = 2.0     # 度分布幂律指数
@@ -381,7 +381,7 @@ if __name__ == '__main__':
         A = A * P
         # 调用适配的生成函数
         # 建议 num_sim 设大一些（如 500+）以获得更准的 Lift 估计
-        S = generate_infections(A, num_sim=100)
+        S = generate_infections(A, num_sim=n_sim)
         
         mi_matrix, p_matrix = fast_imi_and_prob(S.T)
         cluster, fixed_cluster = modified_kmeans_fast_log_partitioned(mi_matrix, node_communities) #log 296
@@ -409,8 +409,7 @@ if __name__ == '__main__':
         
         iterations = 10000
         lr = 0.01
-        auc, me, f1 = run_torch_version(G, N, S, C, A, gamma, prune_network, iterations = iterations, lr=lr)
-        result_record("mymodel", auc, "LFR", param=f'n{N}auc', file = "resultn.jsonl")
-        result_record("mymodel", f1, "LFR", param=f'n{N}f1', file = "resultn.jsonl")
-        result_record("mymodel", me, "LFR", param=f'n{N}me', file = "timen.jsonl")
+        auc, cost_time = run_torch_version(G, N, S, C, A, gamma, prune_network, iterations = iterations, lr=lr)
+        result_record("mymodel", auc, "LFR", f'n{N}p{n_sim}auc', 'process.jsonl')
+        result_record("mymodel", cost_time, "LFR", f'n{N}p{n_sim}', 'time.jsonl')
         

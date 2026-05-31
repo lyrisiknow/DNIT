@@ -1,0 +1,4 @@
+{"mastodon_DNIT_auc": [0.6595, 0.2726]}
+{"mastodon_DNIT_f1": [0.854, 0.319, 0.464]}
+{"email_DNIT_auc": [0.6174, 0.2215]}
+{"email_DNIT_f1": [0.936, 0.169, 0.286]}

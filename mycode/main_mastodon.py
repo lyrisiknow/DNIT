@@ -11,7 +11,7 @@ def get_size_factor(comm_id):
     # 使用 log 缩放可以防止参数爆炸，+1 是为了防止 log(1)=0
     return np.log1p(size)
 
-def result_record(alg_name, ret, dataset, param=''):
+def result_record(alg_name, ret, dataset, param='', file="result.jsonl"):
     # 1. 动态构造键名 (Key)
     key = f"{dataset}_{alg_name}_{param}" if param else f"{dataset}_{alg_name}"
     
@@ -19,7 +19,7 @@ def result_record(alg_name, ret, dataset, param=''):
     record_dict = {key: ret}
     
     # 3. 追加写入文件
-    with open("result.jsonl", 'a') as f:
+    with open(file, 'a') as f:
         # json.dumps 会自动给键加上双引号，并将元组 (0.6..., ...) 转换为列表 [0.6..., ...]
         f.write(json.dumps(record_dict) + '\n')
 
@@ -295,7 +295,7 @@ if __name__ == '__main__':
     A = A * P
     # 调用适配的生成函数
     # 建议 num_sim 设大一些（如 500+）以获得更准的 Lift 估计
-    S = generate_infections(A, num_sim=100) 
+    S = generate_infections(A, num_sim=1000) 
     G = nx.from_numpy_array(A)
     
     print('pre_pruning')
@@ -323,9 +323,9 @@ if __name__ == '__main__':
         
     gamma = 0.01
         
-    iterations = 20000
+    iterations = 10000
     lr = 0.01
-    auc, f1, me = run_torch_version(G, N, S, C, A, gamma, prune_network, iterations = iterations, lr=lr)
+    auc, me, f1 = run_torch_version(G, N, S, C, A, gamma, prune_network, iterations = iterations, lr=lr)
     result_record("mymodel", auc, "mastodon", param=f'auc')
     result_record("mymodel", f1, "mastodon", param=f'f1')
     result_record("mymodel", me, "mastodon", param=f'me')

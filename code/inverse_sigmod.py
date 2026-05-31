@@ -109,6 +109,6 @@ def run_torch_version(A, S, iterations=500, prune_network=None, patience=10, min
     best_t, IG = post_processing(A_final)
     print("RUN TIME : ", end_time, "BEP point : ", best_t, "P , R, F1 : ", calculate_F1(IG, G))
     
-    return calculate_binary_auc(IG, G)
+    return calculate_binary_auc(IG, G), end_time, calculate_F1(IG,G)
 
 

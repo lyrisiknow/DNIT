@@ -251,7 +251,7 @@ def Neighbour_finder(g, p, new_active):
 
     return (targets, edges)
 
-def result_record(alg_name, ret, dataset, param=''):
+def result_record(alg_name, ret, dataset, param='', file="result.jsonl"):
     # 1. 动态构造键名 (Key)
     key = f"{dataset}_{alg_name}_{param}" if param else f"{dataset}_{alg_name}"
     
@@ -259,7 +259,7 @@ def result_record(alg_name, ret, dataset, param=''):
     record_dict = {key: ret}
     
     # 3. 追加写入文件
-    with open("result.jsonl", 'a') as f:
+    with open(file, 'a') as f:
         # json.dumps 会自动给键加上双引号，并将元组 (0.6..., ...) 转换为列表 [0.6..., ...]
         f.write(json.dumps(record_dict) + '\n')
 

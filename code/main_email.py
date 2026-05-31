@@ -77,7 +77,7 @@ if __name__ == '__main__':
     A = A * P
     # 调用适配的生成函数
     # 建议 num_sim 设大一些（如 500+）以获得更准的 Lift 估计
-    S = generate_infections(A, num_sim=100)  
+    S = generate_infections(A, num_sim=1000)  
 
     mi_matrix, p_matrix = calculate_MI(S.T)
     cluster, fixed_cluster = modified_kmeans(mi_matrix)
@@ -90,7 +90,11 @@ if __name__ == '__main__':
     # em_inference(S, A, sample_size = 10, prune_network = prune_network, iterations = 400)
 
     # -------------------inverse sigmod--------------------
-    result_record("DNIT", run_torch_version(A, S, iterations=10000, prune_network=prune_network), "email", param='auc')
+    auc, cost, f1 = run_torch_version(A, S, iterations=2000, prune_network=prune_network)
+    result_record("DNIT", auc, "email", f"auc", 'resultn.jsonl')
+    result_record("DNIT", cost, "email", file = 'timen.jsonl')
+
+    result_record("DNIT", f1, "email", f"f1", 'resultn.jsonl')
 
 
 

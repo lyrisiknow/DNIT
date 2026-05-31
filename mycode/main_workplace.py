@@ -3,6 +3,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 from model1 import run_torch_version
 import json
+from collections import Counter
+
+def get_size_factor(comm_id):
+    community_counts = Counter(node_communities.values())
+    size = community_counts[comm_id]
+    # 使用 log 缩放可以防止参数爆炸，+1 是为了防止 log(1)=0
+    return np.log1p(size)
 
 def result_record(alg_name, ret, dataset, param=''):
     # 1. 动态构造键名 (Key)
@@ -15,6 +22,59 @@ def result_record(alg_name, ret, dataset, param=''):
     with open("result.jsonl", 'a') as f:
         # json.dumps 会自动给键加上双引号，并将元组 (0.6..., ...) 转换为列表 [0.6..., ...]
         f.write(json.dumps(record_dict) + '\n')
+
+def modified_kmeans_fast_log_partitioned(mi_matrix, node_communities, tolerance=1e-7):
+    # 1. 预处理：取对数拉伸低值区差异
+    epsilon = 1e-9
+    log_mi_matrix = np.log(np.clip(mi_matrix, epsilon, None))
+
+    n = mi_matrix.shape[0]
+    triu_indices = np.triu_indices(n, k=1)
+    rows_all, cols_all = triu_indices
+    all_log_values = log_mi_matrix[triu_indices]
+    all_raw_values = mi_matrix[triu_indices]
+
+    # 2. 分组逻辑
+    same_mask = np.array([
+        node_communities.get(r, -1) == node_communities.get(c, -2) 
+        for r, c in zip(rows_all, cols_all)
+    ])
+
+    def find_active_cluster(log_v, raw_v, r_idx, c_idx):
+        if len(log_v) == 0: return {}, {}
+        
+        # 在 Log 空间初始化中心点
+        fixed_centroid = np.min(log_v) 
+        centroid = np.max(log_v)
+        
+        is_stable = False
+        while not is_stable:
+            dist_to_fixed = np.abs(log_v - fixed_centroid)
+            dist_to_active = np.abs(log_v - centroid)
+            active_mask = dist_to_active < dist_to_fixed
+            
+            new_centroid = np.mean(log_v[active_mask]) if np.any(active_mask) else centroid
+            if abs(new_centroid - centroid) < tolerance:
+                is_stable = True
+            centroid = new_centroid
+            
+        final_mask = (np.abs(log_v - centroid) < np.abs(log_v - fixed_centroid))
+        
+        # 构造两个簇的字典
+        active_dict = dict(zip(zip(r_idx[final_mask], c_idx[final_mask]), raw_v[final_mask]))
+        fixed_dict = dict(zip(zip(r_idx[~final_mask], c_idx[~final_mask]), raw_v[~final_mask]))
+        return active_dict, fixed_dict
+
+    # 3. 分类执行聚类
+    cluster_same, fixed_same = find_active_cluster(
+        all_log_values[same_mask], all_raw_values[same_mask], rows_all[same_mask], cols_all[same_mask]
+    )
+    cluster_diff, fixed_diff = find_active_cluster(
+        all_log_values[~same_mask], all_raw_values[~same_mask], rows_all[~same_mask], cols_all[~same_mask]
+    )
+
+    # 4. 合并并返回两个字典 (解决解包报错)
+    return {**cluster_same, **cluster_diff}, {**fixed_same, **fixed_diff}
 
 def modified_kmeans_fast(mi_matrix, tolerance=1e-7):
     n = mi_matrix.shape[0]
@@ -204,7 +264,39 @@ def IC(Networkx_Graph, Seed_Set, Probability):
         # Checking which ones in new_ones are not in our Ans...only adding them to our Ans so that no duplicate in Ans.
 
     return Ans, tree
+#check edge
 
+def check_pruned_edges(G, prune_network):
+    """
+    检查图 G 中的边有多少被 prune_network 过滤掉了
+    """
+    # 1. 获取 G 中所有的边
+    original_edges = list(G.edges())
+    total_g_edges = len(original_edges)
+    
+    missing_edges = []
+    
+    # 2. 遍历 G 的边，检查在矩阵中的对应位置是否为 0
+    for u, v in original_edges:
+        # 确保索引不越界
+        if u < prune_network.shape[0] and v < prune_network.shape[1]:
+            if prune_network[u, v] == 0:
+                missing_edges.append((u, v))
+        else:
+            # 如果节点索引超出了矩阵范围，记录为异常
+            print(f"Warning: Node index ({u}, {v}) out of prune_network bounds.")
+
+    # 3. 计算统计数据
+    num_missing = len(missing_edges)
+    missing_ratio = (num_missing / total_g_edges) * 100 if total_g_edges > 0 else 0
+    
+    print("-" * 30)
+    print(f"原始图 G 总边数: {total_g_edges}")
+    print(f"被剪枝掉的边数 (不在 prune_network 中): {num_missing}")
+    print(f"漏掉比例 (FN 潜在来源): {missing_ratio:.2f}%")
+    print("-" * 30)
+    
+    return missing_edges
 
 def Neighbour_finder(g, p, new_active):
     targets = []
@@ -240,55 +332,80 @@ def generate_infections(A, num_sim = 100):
 
 if __name__ == '__main__':
     edges = set()
-    data_path = '../dataset/email-Eu-core/'
-    with open(data_path+'email-Eu-core.txt', 'r') as f:
+    data_path = '../dataset/contact_in_workplace/'
+    node_communities = {}
+    
+    with open(data_path + 'department.txt', 'r') as f:
         for l in f:
             if l.strip() != '':
-                edges.add((int(l.strip().split(' ')[0]), int(l.strip().split(' ')[1])))
+                # if len(l.strip().split('\t')) < 2:
+                #     print(l)
+                node_communities[int(l.strip().split()[0])] = l.strip().split()[1]
+    nodes_idx = {}
+    for i, node in enumerate(node_communities):
+        nodes_idx[node] = i
+    idx_node = {}
+    for node in nodes_idx:
+        idx_node[nodes_idx[node]] = node
+    with open(data_path+'tij_InVS.dat', 'r') as f:
+        for l in f:
+            if l.strip() != '':
+                edges.add((nodes_idx[int(l.strip().split(' ')[1])], nodes_idx[int(l.strip().split(' ')[2])]))
+                edges.add((nodes_idx[int(l.strip().split(' ')[2])], nodes_idx[int(l.strip().split(' ')[1])]))
     G = nx.DiGraph()
     G.add_edges_from(edges)
     N = len(G)
-    node_communities = {}
-    
-    with open(data_path + 'email-Eu-core-department-labels.txt', 'r') as f:
-        for l in f:
-            if l.strip() != '':
-                node_communities[int(l.strip().split(' ')[0])] = int(l.strip().split(' ')[1])
 
     A = nx.to_numpy_array(G)
     P = np.zeros((N, N))
     for u, v in G.edges():
-        if node_communities[u] == node_communities[v]:
+        c_u = node_communities[idx_node[u]]
+        c_v = node_communities[idx_node[v]]
+        if c_u == c_v:
             weight = np.random.uniform(0.05, 0.1)
         else:
-            weight = np.random.uniform(0.01, 0.05)
+            # 社区之间：核心修改点
+            # 基础跨社区概率
+            base_inter_weight = np.random.uniform(0.005, 0.02)
+            
+            # 规模增强因子：大社区与大社区之间概率更高
+            # 归一化因子（例如除以平均规模的 log 值）以保持权重在合理区间
+            size_boost = get_size_factor(c_u) * get_size_factor(c_v)
+            
+            # 最终权重映射，确保不会超过 0.5（IC 模型通常不建议单边概率过高）
+            weight = base_inter_weight * size_boost
+        
+        # 保证概率上限
+        weight = min(weight, 0.4)
         P[u, v] = weight
         P[v, u] = weight
     A = A * P
     S = generate_infections(A, num_sim=100)
+    G = nx.from_numpy_array(A)
     
     print('pre_pruning')
-    mi_matrix, p_matrix = fast_imi_and_prob(S.T)
-    cluster, fixed_cluster = modified_kmeans_fast(mi_matrix)
+    mi_matrix, p_matrix = fast_mi_and_prob(S.T)
+    cluster, fixed_cluster = modified_kmeans_fast_log_partitioned(mi_matrix, node_communities)
     threshold = max(fixed_cluster.values())
     prune_network = np.zeros([N, N])
     prune_network[mi_matrix > threshold] = 1.0
     prune_network[mi_matrix <= threshold] = 0.0
-    
-    C = node_communities
+    missing = check_pruned_edges(G, prune_network)
+    C = {}
 
     
     l = set()
-    for node in C:
-        l.add(C[node])
+    for node in node_communities:
+        l.add(node_communities[node])
     print(len(l))
     
     dict_c = dict()
     for i, item in enumerate(l):
         dict_c[item] = i
         
-    for node in C:
-        C[node] = dict_c[C[node]]
+    for node in node_communities:
+        C[nodes_idx[node]] = dict_c[node_communities[node]]
         
     gamma = 0.05
-    result_record("mymodel", run_torch_version(G, N, S, C, gamma, prune_network, iterations=1000, lr=0.01), "email")
+    auc, time1 = run_torch_version(G, N, S, C, A, gamma, prune_network, iterations=10000, lr=0.01)
+    result_record("mymodel", auc,  "email", "result.jsonl")

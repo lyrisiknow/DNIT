@@ -5,7 +5,6 @@ from model1 import run_torch_version
 import json
 from collections import Counter
 
-
 def get_size_factor(comm_id):
     community_counts = Counter(node_communities.values())
     size = community_counts[comm_id]
@@ -23,59 +22,6 @@ def result_record(alg_name, ret, dataset, param='', file="result.jsonl"):
     with open(file, 'a') as f:
         # json.dumps 会自动给键加上双引号，并将元组 (0.6..., ...) 转换为列表 [0.6..., ...]
         f.write(json.dumps(record_dict) + '\n')
-
-def modified_kmeans_fast_log_partitioned(mi_matrix, node_communities, tolerance=1e-7):
-    # 1. 预处理：取对数拉伸低值区差异
-    epsilon = 1e-9
-    log_mi_matrix = np.log(np.clip(mi_matrix, epsilon, None))
-
-    n = mi_matrix.shape[0]
-    triu_indices = np.triu_indices(n, k=1)
-    rows_all, cols_all = triu_indices
-    all_log_values = log_mi_matrix[triu_indices]
-    all_raw_values = mi_matrix[triu_indices]
-
-    # 2. 分组逻辑
-    same_mask = np.array([
-        node_communities.get(r, -1) == node_communities.get(c, -2) 
-        for r, c in zip(rows_all, cols_all)
-    ])
-
-    def find_active_cluster(log_v, raw_v, r_idx, c_idx):
-        if len(log_v) == 0: return {}, {}
-        
-        # 在 Log 空间初始化中心点
-        fixed_centroid = np.min(log_v) 
-        centroid = np.max(log_v)
-        
-        is_stable = False
-        while not is_stable:
-            dist_to_fixed = np.abs(log_v - fixed_centroid)
-            dist_to_active = np.abs(log_v - centroid)
-            active_mask = dist_to_active < dist_to_fixed
-            
-            new_centroid = np.mean(log_v[active_mask]) if np.any(active_mask) else centroid
-            if abs(new_centroid - centroid) < tolerance:
-                is_stable = True
-            centroid = new_centroid
-            
-        final_mask = (np.abs(log_v - centroid) < np.abs(log_v - fixed_centroid))
-        
-        # 构造两个簇的字典
-        active_dict = dict(zip(zip(r_idx[final_mask], c_idx[final_mask]), raw_v[final_mask]))
-        fixed_dict = dict(zip(zip(r_idx[~final_mask], c_idx[~final_mask]), raw_v[~final_mask]))
-        return active_dict, fixed_dict
-
-    # 3. 分类执行聚类
-    cluster_same, fixed_same = find_active_cluster(
-        all_log_values[same_mask], all_raw_values[same_mask], rows_all[same_mask], cols_all[same_mask]
-    )
-    cluster_diff, fixed_diff = find_active_cluster(
-        all_log_values[~same_mask], all_raw_values[~same_mask], rows_all[~same_mask], cols_all[~same_mask]
-    )
-
-    # 4. 合并并返回两个字典 (解决解包报错)
-    return {**cluster_same, **cluster_diff}, {**fixed_same, **fixed_diff}
 
 def modified_kmeans_fast(mi_matrix, tolerance=1e-7):
     n = mi_matrix.shape[0]
@@ -266,6 +212,58 @@ def IC(Networkx_Graph, Seed_Set, Probability):
 
     return Ans, tree
 
+def modified_kmeans_fast_log_partitioned(mi_matrix, node_communities, tolerance=1e-7):
+    # 1. 预处理：取对数拉伸低值区差异
+    epsilon = 1e-9
+    log_mi_matrix = np.log(np.clip(mi_matrix, epsilon, None))
+
+    n = mi_matrix.shape[0]
+    triu_indices = np.triu_indices(n, k=1)
+    rows_all, cols_all = triu_indices
+    all_log_values = log_mi_matrix[triu_indices]
+    all_raw_values = mi_matrix[triu_indices]
+
+    # 2. 分组逻辑
+    same_mask = np.array([
+        node_communities.get(r, -1) == node_communities.get(c, -2) 
+        for r, c in zip(rows_all, cols_all)
+    ])
+
+    def find_active_cluster(log_v, raw_v, r_idx, c_idx):
+        if len(log_v) == 0: return {}, {}
+        
+        # 在 Log 空间初始化中心点
+        fixed_centroid = np.min(log_v) 
+        centroid = np.max(log_v)
+        
+        is_stable = False
+        while not is_stable:
+            dist_to_fixed = np.abs(log_v - fixed_centroid)
+            dist_to_active = np.abs(log_v - centroid)
+            active_mask = dist_to_active < dist_to_fixed
+            
+            new_centroid = np.mean(log_v[active_mask]) if np.any(active_mask) else centroid
+            if abs(new_centroid - centroid) < tolerance:
+                is_stable = True
+            centroid = new_centroid
+            
+        final_mask = (np.abs(log_v - centroid) < np.abs(log_v - fixed_centroid))
+        
+        # 构造两个簇的字典
+        active_dict = dict(zip(zip(r_idx[final_mask], c_idx[final_mask]), raw_v[final_mask]))
+        fixed_dict = dict(zip(zip(r_idx[~final_mask], c_idx[~final_mask]), raw_v[~final_mask]))
+        return active_dict, fixed_dict
+
+    # 3. 分类执行聚类
+    cluster_same, fixed_same = find_active_cluster(
+        all_log_values[same_mask], all_raw_values[same_mask], rows_all[same_mask], cols_all[same_mask]
+    )
+    cluster_diff, fixed_diff = find_active_cluster(
+        all_log_values[~same_mask], all_raw_values[~same_mask], rows_all[~same_mask], cols_all[~same_mask]
+    )
+
+    # 4. 合并并返回两个字典 (解决解包报错)
+    return {**cluster_same, **cluster_diff}, {**fixed_same, **fixed_diff}
 
 def Neighbour_finder(g, p, new_active):
     targets = []
@@ -297,63 +295,31 @@ def generate_infections(A, num_sim = 100):
     print("average length of infections: ", average_paths / len(trees))
     return S
 
+
+
 if __name__ == '__main__':
-    for N in [100,150,200,250,300]:
-        np.random.seed(2023)
-        # N = 3000       # -N 1000-3000
-        # AVG_K = 15     # -k 15 (average_degree)
-        # MAX_K = 50     # -maxk 50 (max_degree)
-        # MU = 0.1       # -mu 0.1 (mu)
-        # MIN_C = 20     # -minc 20 (min_community)
-        # MAX_C = 50     # -maxc 50 (max_community)
-
-        AVG_K = 10     # 降低平均度
-        MAX_K = 30     # 降低最大度
-        MIN_C = 30     # 增加最小社区规模，确保能容纳度数较高的节点
-        MAX_C = 60
-        MU = 0.1       # -mu 0.1 (mu)
-
-        # 必须指定的幂律指数 (使用常用值)
-        TAU1 = 2.0     # 度分布幂律指数
-        TAU2 = 2.0     # 社区规模幂律指数
-
-        # 由于参数约束较严格，我们增加最大迭代次数以防 ExceededMaxIterations 错误
-        MAX_I = 100000
-
-        # --- 生成 LFR Benchmark 图 ---
-        try:
-            G = nx.generators.community.LFR_benchmark_graph(
-                n=N, 
-                tau1=TAU1, 
-                tau2=TAU2, 
-                mu=MU, 
-                average_degree=AVG_K, 
-                max_degree=MAX_K,         # 指定最大度
-                min_community=MIN_C, 
-                max_community=MAX_C,      # 指定最大社区规模
-                max_iters=MAX_I,          # 增加迭代次数
-                seed=42
-            )
-
-            print(f"✅ LFR网络生成成功！")
-            print(f"生成的LFR网络节点数: {G.number_of_nodes()}")
-            print(f"生成的LFR网络边数: {G.number_of_edges()}")
-
-            # 获取地面真值社区
-            communities = {frozenset(G.nodes[v]['community']) for v in G}
-            print(f"真实的社区数量: {len(communities)}")
-            
-        except nx.ExceededMaxIterations as e:
-            print(f"❌ 生成失败: {e}")
-            print("请尝试进一步调整参数（例如增加MAX_I或略微放宽社区规模约束）。")
-
-        unique_comms = sorted(list(set(tuple(G.nodes[n]['community']) for n in G.nodes)))
-
-        # 2. 创建一个映射字典：{原始集合: 新的数字编号}
-        comm_to_id = {comm: i for i, comm in enumerate(unique_comms)}
-
-        # 3. 生成最终的 node_communities，其 value 全部为数字
-        node_communities = {n: comm_to_id[tuple(G.nodes[n]['community'])] for n in G.nodes}
+    for n_sim in [50,100,150,200,250]:
+        edges = set()
+        data_path = '../dataset/contact_in_workplace/'
+        with open(data_path+'tij_InVS.dat', 'r') as f:
+            for l in f:
+                if l.strip() != '':
+                    edges.add((int(l.strip().split(' ')[1]), int(l.strip().split(' ')[2])))
+                    edges.add((int(l.strip().split(' ')[2]), int(l.strip().split(' ')[1])))
+        G = nx.DiGraph()
+        G.add_edges_from(edges)
+        N = len(G)
+        node_communities = {}
+        
+        with open(data_path + 'department.txt', 'r') as f:
+            for l in f:
+                if l.strip() != '':
+                    # if len(l.strip().split('\t')) < 2:
+                    #     print(l)
+                    node_communities[int(l.strip().split()[0])] = l.strip().split()[1]
+        nodes_idx = {}
+        for i, node in enumerate(node_communities):
+            nodes_idx[node] = i
 
         A = nx.to_numpy_array(G)
         P = np.zeros((N, N))
@@ -376,41 +342,42 @@ if __name__ == '__main__':
             
             # 保证概率上限
             weight = min(weight, 0.4)
-            P[u, v] = weight
-            P[v, u] = weight
+            ui = nodes_idx[u]
+            vi = nodes_idx[v]
+            P[ui, vi] = weight
+            P[vi, ui] = weight
         A = A * P
         # 调用适配的生成函数
         # 建议 num_sim 设大一些（如 500+）以获得更准的 Lift 估计
-        S = generate_infections(A, num_sim=100)
-        
-        mi_matrix, p_matrix = fast_imi_and_prob(S.T)
-        cluster, fixed_cluster = modified_kmeans_fast_log_partitioned(mi_matrix, node_communities) #log 296
+        S = generate_infections(A, num_sim=n_sim) 
+        G = nx.from_numpy_array(A)
+    
+        print('pre_pruning')
+        mi_matrix, p_matrix = fast_mi_and_prob(S.T)
+        cluster, fixed_cluster = modified_kmeans_fast_log_partitioned(mi_matrix, node_communities)
         threshold = max(fixed_cluster.values())
         prune_network = np.zeros([N, N])
         prune_network[mi_matrix > threshold] = 1.0
         prune_network[mi_matrix <= threshold] = 0.0
-        
-        G = nx.from_numpy_array(A)
-        
-        C = node_communities
-        l = set()
-        for node in C:
-            l.add(C[node])
-        print(len(l))
+        C = {}
 
+        
+        l = set()
+        for node in node_communities:
+            l.add(node_communities[node])
+        print(len(l))
+        
         dict_c = dict()
         for i, item in enumerate(l):
             dict_c[item] = i
             
-        for node in C:
-            C[node] = dict_c[C[node]]
+        for node in node_communities:
+            C[nodes_idx[node]] = dict_c[node_communities[node]]
             
-        gamma = 0.1
-        
+        gamma = 0.05
+            
         iterations = 10000
         lr = 0.01
-        auc, me, f1 = run_torch_version(G, N, S, C, A, gamma, prune_network, iterations = iterations, lr=lr)
-        result_record("mymodel", auc, "LFR", param=f'n{N}auc', file = "resultn.jsonl")
-        result_record("mymodel", f1, "LFR", param=f'n{N}f1', file = "resultn.jsonl")
-        result_record("mymodel", me, "LFR", param=f'n{N}me', file = "timen.jsonl")
-        
+        auc, cost_time = run_torch_version(G, N, S, C, A, gamma, prune_network, iterations = iterations, lr=lr)
+        result_record("mymodel", auc, "workplace", f'p{n_sim}auc', 'process.jsonl')
+        result_record("mymodel", cost_time, "workplace", f'p{n_sim}', 'time.jsonl')

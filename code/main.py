@@ -3,7 +3,7 @@ from IC_model import IC
 from inverse_sigmod import run_torch_version
 from MCEM import inference as em_inference
 import numpy as np
-from utils import calculate_MI, modified_kmeans
+from utils import calculate_MI, modified_kmeans, result_record
 import warnings
 from collections import Counter
 
@@ -102,7 +102,7 @@ if __name__ == '__main__':
         A = A * P
         # 调用适配的生成函数
         # 建议 num_sim 设大一些（如 500+）以获得更准的 Lift 估计
-        S = generate_infections(A, num_sim=100) 
+        S = generate_infections(A, num_sim=1000) 
 
         mi_matrix, p_matrix = calculate_MI(S.T)
         cluster, fixed_cluster = modified_kmeans(mi_matrix)
@@ -115,7 +115,10 @@ if __name__ == '__main__':
         # em_inference(S, A, sample_size = 10, prune_network = prune_network, iterations = 400)
 
         # -------------------inverse sigmod--------------------
-        run_torch_version(A, S, iterations=1000, prune_network=prune_network)
+        auc, f1, cost_time = run_torch_version(A, S, iterations=10000, prune_network=prune_network)
+        result_record("DNIT", auc, "LFR", f"n{N}auc", 'processn.jsonl')
+        result_record("DNIT", f1, "LFR", f"n{N}f1", 'processn.jsonl')
+        result_record("DNIT", cost_time, "LFR", f"n{N}", 'timen.jsonl')
 
 
 

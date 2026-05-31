@@ -14,6 +14,7 @@ from TWIND import run_twind_fast
 from k_lifts import estimate_lifts, k_lifts_algorithm
 from PIND import pind_inference
 from collections import Counter
+import time
 
 def get_size_factor(comm_id):
     community_counts = Counter(node_communities.values())
@@ -71,21 +72,46 @@ if __name__ == '__main__':
     print('TWIND:')
     IG = nx.DiGraph()
     IG.add_nodes_from(nodes)
-    IG.add_edges_from(run_twind_fast(S))
-    result_record("TWIND", calculate_binary_auc(IG, G), "email", param='auc')
+    start_time = time.time()  # 开始计时
+    twind_edges = run_twind_fast(S)
+    end_time = time.time()    # 结束计时
+    twind_cost = end_time - start_time
+    IG.add_edges_from(twind_edges)
+    result_record("TWIND", calculate_binary_auc(IG, G), "mastodon", f"n{N}auc", 'resultn.jsonl')
+    result_record("TWIND", twind_cost, "mastodon", f"n{N}", 'timen.jsonl')
+    result_record("TWIND", calculate_F1(IG, G), "mastodon", f"n{N}f1", 'resultn.jsonl')
     
     print('TENDS:')
     IG = nx.DiGraph()
     IG.add_nodes_from(nodes)
-    IG.add_edges_from(tends_algorithm(N, S))
-    result_record("TENDS", calculate_binary_auc(IG, G), "email", param='auc')
+    start_time = time.time()
+    tends_edges = tends_algorithm(N, S)
+    end_time = time.time()
+    tends_cost = end_time - start_time
+    IG.add_edges_from(tends_edges)
+    result_record("TENDS", calculate_binary_auc(IG, G), "mastodon", f"n{N}auc", 'resultn.jsonl')
+    result_record("TENDS", tends_cost, "mastodon", f"n{N}", 'timen.jsonl')
+    result_record("TENDS", calculate_F1(IG, G), "mastodon", f"n{N}f1", 'resultn.jsonl')
     
     print('SIDN:')
-    IG = nx.DiGraph()
-    IG = nx.from_numpy_array(infer_sidn_network(S), create_using=nx.DiGraph)
-    result_record("SIDN", calculate_binary_auc(IG, G), "email", param='auc')
+    start_time = time.time()
+    sidn_matrix = infer_sidn_network(S)
+    end_time = time.time()
+    sidn_cost = end_time - start_time
+
+    IG = nx.from_numpy_array(sidn_matrix, create_using=nx.DiGraph)
+    result_record("SIDN", calculate_binary_auc(IG, G), "mastodon", f"n{N}auc", 'resultn.jsonl')
+    result_record("SIDN", sidn_cost, "mastodon", f"n{N}", 'timen.jsonl')
+
+    result_record("SIDN", calculate_F1(IG, G), "mastodon", f"n{N}f1", 'resultn.jsonl')
     
     print('PIND:')
-    IG = nx.DiGraph()
-    IG = nx.from_numpy_array(pind_inference(S), create_using=nx.DiGraph)
-    result_record("PIND", calculate_binary_auc(IG, G), "email", param='auc')
+    start_time = time.time()
+    pind_matrix = pind_inference(S)
+    end_time = time.time()
+    pind_cost = end_time - start_time
+
+    IG = nx.from_numpy_array(pind_matrix, create_using=nx.DiGraph)
+    result_record("PIND", calculate_binary_auc(IG, G), "mastodon", f"n{N}auc", 'resultn.jsonl')
+    result_record("PIND", pind_cost, "mastodon", f"n{N}", 'timen.jsonl')
+    result_record("PIND", calculate_F1(IG, G), "mastodon", f"n{N}f1", 'resultn.jsonl')

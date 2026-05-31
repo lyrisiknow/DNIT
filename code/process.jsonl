@@ -1,0 +1,10 @@
+{"email_DNIT_p50auc": [0.6008, 0.0156]}
+{"email_DNIT_p100auc": [0.6, 0.0172]}
+{"email_DNIT_p150auc": [0.6039, 0.0244]}
+{"email_DNIT_p200auc": [0.6137, 0.0426]}
+{"email_DNIT_p250auc": [0.6093, 0.0484]}
+{"email_DNIT_p500auc": [0.6131, 0.1539]}
+{"email_DNIT_p1000auc": [0.6132, 0.2066]}
+{"email_DNIT_p1500auc": [0.6204, 0.2376]}
+{"email_DNIT_p2000auc": [0.6221, 0.2427]}
+{"email_DNIT_p2500auc": [0.6179, 0.2317]}
