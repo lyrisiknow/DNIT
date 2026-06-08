@@ -4,6 +4,7 @@ from sklearn.cluster import KMeans
 import networkx as nx
 from tqdm import tqdm
 from utils import generate_infections, result_record, calculate_F1, IC, Neighbour_finder
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 def compute_mutual_information(prob_matrix):
     """
@@ -75,46 +76,64 @@ def objective_function(x, alpha, j, parents, prob_matrix):
     log_likelihood = u_j * np.log(prob_infection) + (1 - u_j) * np.log(1 - prob_infection)
     return -np.sum(log_likelihood)
 
-def pind_inference(prob_matrix, max_iter=10):
+def _optimize_node(j, parents, prob_matrix, max_iter):
+    # 如果没有候选父节点，直接返回空结果
+    if len(parents) == 0:
+        return j, parents, None
+        
+    num_p = len(parents)
+    x = np.full(num_p, 0.5)
+    alpha = 0.5 
+    
+    # 【优化点1】将边界条件移出内层循环，避免不必要的重复内存分配
+    bounds = [(0, 1)] * num_p
+    
+    for i in range(max_iter):
+        # 固定 alpha，优化 x
+        res = minimize(objective_function, x, args=(alpha, j, parents, prob_matrix), 
+                       bounds=bounds, method='L-BFGS-B')
+        x = res.x
+        
+        # (可选) 固定 x，优化 alpha 的逻辑...
+        
+    return j, parents, x
+
+def pind_inference(prob_matrix, max_iter=10, n_workers=None):
     """
-    PIND 主函数
+    PIND 主函数 (多进程加速版)
     prob_matrix: 形状为 (级联数, 节点数) 的概率矩阵
+    n_workers: 进程数。默认为 None (使用所有可用 CPU 核心)
     """
     C, N = prob_matrix.shape
     
     # 1. 剪枝
     print("正在进行互信息剪枝...")
+    # 假设这两个函数在外部已定义
     mi_matrix = compute_mutual_information(prob_matrix)
     candidate_parents = pruning_stage(mi_matrix)
     
     # 初始化网络矩阵 A (N x N)
     estimated_adj = np.zeros((N, N))
     
-    # 2. 交替最大化迭代
-    print("正在进行非线性回归推断...")
-    for j in tqdm(range(N)):
-        parents = candidate_parents[j]
-        if len(parents) == 0: continue
+    # 2. 交替最大化迭代 (并行化)
+    print("正在进行非线性回归推断 (多核并行加速中)...")
+    
+    # 【优化点2】使用进程池并发执行独立的节点推断任务
+    with ProcessPoolExecutor(max_workers=n_workers) as executor:
+        # 构建任务字典，保存 future 对应的节点索引 j
+        futures = {
+            executor.submit(_optimize_node, j, candidate_parents[j], prob_matrix, max_iter): j 
+            for j in range(N)
+        }
         
-        num_p = len(parents)
-        # 初始化待优化参数：边概率 x 和 传播强度 alpha
-        x = np.full(num_p, 0.5)
-        alpha = 0.5 
-        
-        for i in range(max_iter):
-            # 固定 alpha，优化 x
-            # 约束条件：0 <= x <= 1
-            bounds = [(0, 1)] * num_p
-            res = minimize(objective_function, x, args=(alpha, j, parents, prob_matrix), 
-                           bounds=bounds, method='L-BFGS-B')
-            x = res.x
+        # 使用 tqdm 结合 as_completed 实现准确的并行进度条
+        for future in tqdm(as_completed(futures), total=N):
+            j, parents, x = future.result()
             
-            # (可选) 固定 x，优化 alpha
-            # 论文中 alpha 也可以是矩阵，这里简化处理
-            
-        # 记录结果（此处可根据阈值转换为 0/1）
-        estimated_adj[parents, j] = x
-        
+            # 记录结果
+            if x is not None:
+                estimated_adj[parents, j] = x
+                
     return estimated_adj
 
 if __name__ == '__main__':

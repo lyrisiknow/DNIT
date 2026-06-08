@@ -109,26 +109,26 @@
 {"email_TWIND_p2500auc": [0.7153, 0.4286]}
 {"email_TENDS_p2500auc": [0.734, 0.4178]}
 {"email_SIDN_p2500auc": [0.7519, 0.495]}
-{"LFR_mymodel_n1000p500auc": [0.5725, 0.0618]}
-{"LFR_mymodel_n1000p1000auc": [0.6216, 0.0937]}
-{"LFR_mymodel_n1000p1500auc": [0.5613, 0.0391]}
-{"LFR_mymodel_n1000p2000auc": [0.6455, 0.1828]}
-{"LFR_mymodel_n1000p2500auc": [0.635, 0.1599]}
-{"LFR_mymodel_n100p50auc": [0.5681, 0.1864]}
-{"LFR_mymodel_n100p100auc": [0.6026, 0.2188]}
-{"LFR_mymodel_n100p150auc": [0.6294, 0.2621]}
-{"LFR_mymodel_n100p200auc": [0.6441, 0.2979]}
-{"LFR_mymodel_n100p250auc": [0.6541, 0.3234]}
-{"mastodon_mymodel_p500auc": [0.7399, 0.3864]}
-{"mastodon_mymodel_p1000auc": [0.785, 0.4656]}
-{"mastodon_mymodel_p1500auc": [0.8028, 0.5049]}
-{"mastodon_mymodel_p2000auc": [0.8218, 0.5522]}
-{"mastodon_mymodel_p2500auc": [0.8361, 0.5855]}
-{"workplace_mymodel_p50auc": [0.7534, 0.2367]}
-{"workplace_mymodel_p100auc": [0.8501, 0.3374]}
-{"workplace_mymodel_p150auc": [0.8591, 0.3375]}
-{"workplace_mymodel_p200auc": [0.8976, 0.3355]}
-{"workplace_mymodel_p250auc": [0.9075, 0.4057]}
+{"LFR_ComInf_n1000p500auc": [0.5725, 0.0618]}
+{"LFR_ComInf_n1000p1000auc": [0.6216, 0.0937]}
+{"LFR_ComInf_n1000p1500auc": [0.5613, 0.0391]}
+{"LFR_ComInf_n1000p2000auc": [0.6455, 0.1828]}
+{"LFR_ComInf_n1000p2500auc": [0.635, 0.1599]}
+{"LFR_ComInf_n100p50auc": [0.5681, 0.1864]}
+{"LFR_ComInf_n100p100auc": [0.6026, 0.2188]}
+{"LFR_ComInf_n100p150auc": [0.6294, 0.2621]}
+{"LFR_ComInf_n100p200auc": [0.6441, 0.2979]}
+{"LFR_ComInf_n100p250auc": [0.6541, 0.3234]}
+{"mastodon_ComInf_p500auc": [0.7399, 0.3864]}
+{"mastodon_ComInf_p1000auc": [0.785, 0.4656]}
+{"mastodon_ComInf_p1500auc": [0.8028, 0.5049]}
+{"mastodon_ComInf_p2000auc": [0.8218, 0.5522]}
+{"mastodon_ComInf_p2500auc": [0.8361, 0.5855]}
+{"workplace_ComInf_p50auc": [0.7534, 0.2367]}
+{"workplace_ComInf_p100auc": [0.8501, 0.3374]}
+{"workplace_ComInf_p150auc": [0.8591, 0.3375]}
+{"workplace_ComInf_p200auc": [0.8976, 0.3355]}
+{"workplace_ComInf_p250auc": [0.9075, 0.4057]}
 {"mastodon_TWIND_p500auc": [0.627, 0.2416]}
 {"mastodon_TENDS_p500auc": [0.6323, 0.2499]}
 {"mastodon_SIDN_p500auc": [0.7072, 0.3591]}
@@ -194,16 +194,16 @@
 {"workplace_DNIT_p150auc": [0.6664, 0.2973]}
 {"workplace_DNIT_p200auc": [0.6601, 0.3038]}
 {"workplace_DNIT_p250auc": [0.6534, 0.2961]}
-{"email_mymodel_p500auc": [0.9404, 0.4704]}
-{"email_mymodel_p1000auc": [0.9542, 0.5414]}
-{"email_mymodel_p1500auc": [0.9585, 0.5432]}
-{"email_mymodel_p2000auc": [0.969, 0.5625]}
-{"email_mymodel_p2500auc": [0.9745, 0.5955]}
-{"workplace_mymodel_p50auc": [0.8197, 0.4011]}
-{"workplace_mymodel_p100auc": [0.8815, 0.4514]}
-{"workplace_mymodel_p150auc": [0.9427, 0.6979]}
-{"workplace_mymodel_p200auc": [0.9385, 0.6903]}
-{"workplace_mymodel_p250auc": [0.9712, 0.7262]}
+{"email_ComInf_p500auc": [0.9404, 0.4704]}
+{"email_ComInf_p1000auc": [0.9542, 0.5414]}
+{"email_ComInf_p1500auc": [0.9585, 0.5432]}
+{"email_ComInf_p2000auc": [0.969, 0.5625]}
+{"email_ComInf_p2500auc": [0.9745, 0.5955]}
+{"workplace_ComInf_p50auc": [0.8197, 0.4011]}
+{"workplace_ComInf_p100auc": [0.8815, 0.4514]}
+{"workplace_ComInf_p150auc": [0.9427, 0.6979]}
+{"workplace_ComInf_p200auc": [0.9385, 0.6903]}
+{"workplace_ComInf_p250auc": [0.9712, 0.7262]}
 {"email_DNIT_p500auc": [0.6131, 0.1539]}
 {"email_DNIT_p1000auc": [0.6132, 0.2066]}
 {"email_DNIT_p1500auc": [0.6204, 0.2376]}
@@ -241,16 +241,17 @@
 {"LFR_DNIT_n1000p1000auc": [0.5301, 0.0288]}
 {"LFR_DNIT_n1000p1500auc": [0.5397, 0.0352]}
 {"LFR_DNIT_n1000p2000auc": [0.5108, 0.0226]}
-{"LFR_mymodel_n1000auc": [0.6774, 0.0413]}
-{"LFR_mymodel_n1000f1": [0.105, 0.031, 0.048]}
-{"LFR_mymodel_n1500auc": [0.6954, 0.028]}
-{"LFR_mymodel_n1500f1": [0.064, 0.023, 0.034]}
-{"LFR_mymodel_n2000auc": [0.718, 0.0232]}
-{"LFR_mymodel_n2000f1": [0.057, 0.022, 0.032]}
-{"LFR_mymodel_n2500auc": [0.7097, 0.0186]}
-{"LFR_mymodel_n2500f1": [0.051, 0.018, 0.027]}
-{"LFR_mymodel_n3000auc": [0.7118, 0.0151]}
-{"LFR_mymodel_n3000f1": [0.035, 0.017, 0.023]}
+{"LFR_DNIT_n1000p2500auc": [0.5576, 0.0523]}
+{"LFR_ComInf_n1000auc": [0.8645, 0.194]}
+{"LFR_ComInf_n1000f1": [0.412, 0.271, 0.327]}
+{"LFR_ComInf_n1500auc": [0.8724, 0.1471]}
+{"LFR_ComInf_n1500f1": [0.349, 0.243, 0.286]}
+{"LFR_ComInf_n2000auc": [0.8794, 0.1446]}
+{"LFR_ComInf_n2000f1": [0.356, 0.248, 0.292]}
+{"LFR_ComInf_n2500auc": [0.8852, 0.1216]}
+{"LFR_ComInf_n2500f1": [0.306, 0.231, 0.263]}
+{"LFR_ComInf_n3000auc": [0.8799, 0.1074]}
+{"LFR_ComInf_n3000f1": [0.293, 0.222, 0.253]}
 {"LFR_TWIND_n1000auc": [0.5493, 0.0436]}
 {"LFR_TWIND_n1000f1": [0.24, 0.193, 0.214]}
 {"LFR_TENDS_n1000auc": [0.5281, 0.0294]}
@@ -305,13 +306,129 @@
 {"email_SIDN_p2500f1": [0.985, 0.524, 0.684]}
 {"email_PIND_p2500auc": [0.523, 0.0482]}
 {"email_PIND_p2500f1": [0.613, 0.724, 0.664]}
-{"LFR_mymodel_n100auc": [0.7283, 0.3148]}
-{"LFR_mymodel_n100f1": [0.561, 0.122, 0.2]}
-{"LFR_mymodel_n150auc": [0.7462, 0.2599]}
-{"LFR_mymodel_n150f1": [0.478, 0.11, 0.179]}
-{"LFR_mymodel_n200auc": [0.7677, 0.2395]}
-{"LFR_mymodel_n200f1": [0.448, 0.118, 0.186]}
-{"LFR_mymodel_n250auc": [0.7746, 0.1995]}
-{"LFR_mymodel_n250f1": [0.365, 0.101, 0.158]}
-{"LFR_mymodel_n300auc": [0.7622, 0.1459]}
-{"LFR_mymodel_n300f1": [0.312, 0.086, 0.135]}
+{"LFR_ComInf_n100auc": [0.7283, 0.3148]}
+{"LFR_ComInf_n100f1": [0.561, 0.122, 0.2]}
+{"LFR_ComInf_n150auc": [0.7462, 0.2599]}
+{"LFR_ComInf_n150f1": [0.478, 0.11, 0.179]}
+{"LFR_ComInf_n200auc": [0.7677, 0.2395]}
+{"LFR_ComInf_n200f1": [0.448, 0.118, 0.186]}
+{"LFR_ComInf_n250auc": [0.7746, 0.1995]}
+{"LFR_ComInf_n250f1": [0.365, 0.101, 0.158]}
+{"LFR_ComInf_n300auc": [0.7622, 0.1459]}
+{"LFR_ComInf_n300f1": [0.312, 0.086, 0.135]}
+{"LFR_klifts_n100auc": [0.5548, 0.1668]}
+{"LFR_klifts_n100f1": [0.236, 0.236, 0.236]}
+{"LFR_klifts_n150auc": [0.494, 0.0969]}
+{"LFR_klifts_n150f1": [0.087, 0.087, 0.087]}
+{"LFR_klifts_n200auc": [0.4927, 0.0715]}
+{"LFR_klifts_n200f1": [0.059, 0.059, 0.059]}
+{"LFR_klifts_n250auc": [0.4986, 0.058]}
+{"LFR_klifts_n250f1": [0.056, 0.056, 0.056]}
+{"LFR_klifts_n300auc": [0.495, 0.0486]}
+{"LFR_klifts_n300f1": [0.04, 0.04, 0.04]}
+{"LFR_TWIND_n100auc": [0.5503, 0.1832]}
+{"LFR_TWIND_n100f1": [0.461, 0.237, 0.313]}
+{"LFR_TENDS_n100auc": [0.5681, 0.1917]}
+{"LFR_TENDS_n100f1": [0.413, 0.333, 0.368]}
+{"LFR_SIDN_n100auc": [0.529, 0.1695]}
+{"LFR_SIDN_n100f1": [0.552, 0.152, 0.239]}
+{"LFR_PIND_n100auc": [0.5114, 0.1604]}
+{"LFR_PIND_n100f1": [0.413, 0.38, 0.396]}
+{"LFR_TWIND_n150auc": [0.5399, 0.1232]}
+{"LFR_TWIND_n150f1": [0.376, 0.204, 0.265]}
+{"LFR_TENDS_n150auc": [0.5572, 0.1321]}
+{"LFR_TENDS_n150f1": [0.332, 0.276, 0.301]}
+{"LFR_SIDN_n150auc": [0.5317, 0.1245]}
+{"LFR_SIDN_n150f1": [0.479, 0.138, 0.214]}
+{"LFR_PIND_n150auc": [0.5081, 0.1049]}
+{"LFR_PIND_n150f1": [0.339, 0.352, 0.345]}
+{"LFR_TWIND_n200auc": [0.5497, 0.1071]}
+{"LFR_TWIND_n200f1": [0.378, 0.209, 0.269]}
+{"LFR_TENDS_n200auc": [0.5652, 0.1126]}
+{"LFR_TENDS_n200f1": [0.334, 0.287, 0.309]}
+{"LFR_SIDN_n200auc": [0.5305, 0.0978]}
+{"LFR_SIDN_n200f1": [0.458, 0.132, 0.205]}
+{"LFR_PIND_n200auc": [0.5079, 0.0806]}
+{"LFR_PIND_n200f1": [0.295, 0.335, 0.314]}
+{"LFR_TWIND_n250auc": [0.544, 0.0849]}
+{"LFR_TWIND_n250f1": [0.319, 0.177, 0.228]}
+{"LFR_TENDS_n250auc": [0.5579, 0.0887]}
+{"LFR_TENDS_n250f1": [0.281, 0.245, 0.262]}
+{"LFR_SIDN_n250auc": [0.5321, 0.0848]}
+{"LFR_SIDN_n250f1": [0.427, 0.126, 0.194]}
+{"LFR_PIND_n250auc": [0.5081, 0.0666]}
+{"LFR_PIND_n250f1": [0.28, 0.303, 0.291]}
+{"LFR_TWIND_n300auc": [0.5328, 0.0655]}
+{"LFR_TWIND_n300f1": [0.258, 0.147, 0.187]}
+{"LFR_TENDS_n300auc": [0.5394, 0.0649]}
+{"LFR_TENDS_n300f1": [0.218, 0.193, 0.205]}
+{"LFR_SIDN_n300auc": [0.5196, 0.0602]}
+{"LFR_SIDN_n300f1": [0.298, 0.09, 0.138]}
+{"LFR_PIND_n300auc": [0.5077, 0.0556]}
+{"LFR_PIND_n300f1": [0.214, 0.252, 0.232]}
+{"LFR_DNIT_n1000auc": [0.5065, 0.0213]}
+{"LFR_DNIT_n1000f1": 3914.7611632347107}
+{"LFR_DNIT_n1500auc": [0.5061, 0.0144]}
+{"LFR_DNIT_n1500f1": 8793.562278985977}
+{"LFR_DNIT_n2000auc": [0.5027, 0.0103]}
+{"LFR_DNIT_n2000f1": 520.5748498439789}
+{"LFR_DNIT_n2500auc": [0.5025, 0.0083]}
+{"LFR_DNIT_n2500f1": 861.1384899616241}
+{"LFR_DNIT_n3000auc": [0.502, 0.0068]}
+{"LFR_DNIT_n3000f1": 1266.820549249649}
+{"LFR_ComInf_n100auc-": [0.7278, 0.3141]}
+{"LFR_ComInf_n100f1-": [0.54, 0.105, 0.175]}
+{"LFR_ComInf_n150auc-": [0.7461, 0.2594]}
+{"LFR_ComInf_n150f1-": [0.462, 0.102, 0.167]}
+{"LFR_ComInf_n200auc-": [0.7676, 0.2392]}
+{"LFR_ComInf_n200f1-": [0.438, 0.094, 0.155]}
+{"LFR_ComInf_n250auc-": [0.7745, 0.1992]}
+{"LFR_ComInf_n250f1-": [0.349, 0.082, 0.132]}
+{"LFR_ComInf_n300auc-": [0.7622, 0.1457]}
+{"LFR_ComInf_n300f1-": [0.29, 0.071, 0.114]}
+{"LFR_ComInf_n1000auc-": [0.6772, 0.0407]}
+{"LFR_ComInf_n1000f1-": [0.074, 0.026, 0.038]}
+{"LFR_ComInf_n1500auc-": [0.6953, 0.0277]}
+{"LFR_ComInf_n1500f1-": [0.046, 0.025, 0.032]}
+{"LFR_ComInf_n2000auc-": [0.7179, 0.023]}
+{"LFR_ComInf_n2000f1-": [0.046, 0.029, 0.035]}
+{"LFR_ComInf_n2500auc-": [0.7097, 0.0183]}
+{"LFR_ComInf_n2500f1-": [0.038, 0.02, 0.026]}
+{"LFR_ComInf_n3000auc-": [0.7118, 0.015]}
+{"LFR_ComInf_n3000f1-": [0.035, 0.033, 0.034]}
+{"LFR_PIND_n2000auc": [0.5146, 0.0292]}
+{"LFR_PIND_n2000f1": [0.019, 0.951, 0.037]}
+{"LFR_PIND_n3000auc": [0.5006, 0.0077]}
+{"LFR_PIND_n3000f1": [0.012, 0.882, 0.023]}
+{"LFR_TWIND_n2500auc": [0.5468, 0.0248]}
+{"LFR_TWIND_n2500f1": [0.181, 0.179, 0.18]}
+{"LFR_TENDS_n2500auc": [0.5317, 0.0176]}
+{"LFR_TENDS_n2500f1": [0.152, 0.124, 0.137]}
+{"LFR_SIDN_n2500auc": [0.5219, 0.0242]}
+{"LFR_SIDN_n2500f1": [0.381, 0.084, 0.138]}
+{"LFR_TWIND_n2000auc": [0.5448, 0.0256]}
+{"LFR_TWIND_n2000f1": [0.175, 0.171, 0.173]}
+{"LFR_TENDS_n2000auc": [0.5207, 0.0148]}
+{"LFR_TENDS_n2000f1": [0.114, 0.085, 0.098]}
+{"LFR_SIDN_n2000auc": [0.5248, 0.0307]}
+{"LFR_SIDN_n2000f1": [0.426, 0.094, 0.155]}
+{"LFR_TWIND_n3000auc": [0.5441, 0.0212]}
+{"LFR_TWIND_n3000f1": [0.161, 0.168, 0.165]}
+{"LFR_TENDS_n3000auc": [0.5209, 0.0112]}
+{"LFR_TENDS_n3000f1": [0.107, 0.085, 0.095]}
+{"LFR_SIDN_n3000auc": [0.5222, 0.0252]}
+{"LFR_SIDN_n3000f1": [0.385, 0.085, 0.139]}
+{"LFR_PIND_n2500auc": [0.5105, 0.0196]}
+{"LFR_PIND_n2500f1": [0.015, 0.968, 0.029]}
+{"LFR_klifts_n1000auc": [0.4961, 0.0204]}
+{"LFR_klifts_n1000f1": [0.013, 0.013, 0.013]}
+{"LFR_klifts_n1500auc": [0.4966, 0.0136]}
+{"LFR_klifts_n1500f1": [0.007, 0.007, 0.007]}
+{"LFR_klifts_n2000auc": [0.4976, 0.0101]}
+{"LFR_klifts_n2000f1": [0.006, 0.006, 0.006]}
+{"LFR_klifts_n2500auc": [0.4983, 0.0081]}
+{"LFR_klifts_n2500f1": [0.005, 0.005, 0.005]}
+{"LFR_klifts_n3000auc": [0.4985, 0.0067]}
+{"LFR_klifts_n3000f1": [0.004, 0.004, 0.004]}
+{"LFR_PIND_n1500auc": [0.5162, 0.0308]}
+{"LFR_PIND_n1500f1": [0.025, 0.943, 0.048]}

@@ -3,6 +3,7 @@ import numpy as np
 import itertools
 from utils import result_record, calculate_F1, calculate_binary_auc
 from collections import Counter
+import time
 
 def get_size_factor(comm_id):
     community_counts = Counter(node_communities.values())
@@ -168,7 +169,7 @@ if __name__ == '__main__':
         A = A * P
         # 调用适配的生成函数
         # 建议 num_sim 设大一些（如 500+）以获得更准的 Lift 估计
-        S = generate_infections(A, num_sim=200) 
+        S = generate_infections(A, num_sim=1000) 
         G = nx.from_numpy_array(A)
 
         # ==========================================
@@ -178,12 +179,16 @@ if __name__ == '__main__':
         # 执行 K-Lifts 推断
         print("正在计算 Lift 指标并推断网络结构...")
         vertices = list(range(N))
+        start_time = time.time()
         lifts = estimate_lifts(vertices, S)
         K_target = G.number_of_edges() # 设定推断边数等于真实边数
         predicted_edges = k_lifts_algorithm(vertices, lifts, K_target)
+        k_time = time.time() - start_time
         nodes = list(G.nodes())
         IG = nx.DiGraph()
         IG.add_nodes_from(nodes)
         IG.add_edges_from(predicted_edges)
 
-        result_record("klifts", calculate_binary_auc(IG, G), "LFR", f"n{N}auc")
+        result_record("klifts", calculate_binary_auc(IG, G), "LFR", f"n{N}auc", 'resultn.jsonl')
+        result_record("klifts", k_time, "LFR", f"n{N}", 'timen.jsonl')
+        result_record("klifts", calculate_F1(IG, G), "LFR", f"n{N}f1", 'resultn.jsonl')
